@@ -4,7 +4,7 @@ FILE: log_parser.py
 Author: Joshua Kercher
 
 Log parser for GE HealthCare battery logs. Creates four .dat files with schema "hostName, device, timestamp, temp/voltage/current/capacity"
-Command line useage: "log_parser.py <log file name>"
+Command line useage: "python3 log_parser.py <log file name>"
 
 """
 import sys
@@ -26,13 +26,13 @@ def parseLog(log_file, tempTable, voltageTable, currentTable, capacityTable):
         PerfData = loads(log['description'][i])['PerfData']
         for data in PerfData:
             if ('B.STATE.V' in data.keys()):
-                voltageTable.write(log['hostName'][i] + "|" + data['resource'] + "|" + data['timestamp'] + "|" + str(data['B.STATE.V']) + "\n")
+                voltageTable.write(log['hostName'][i] + "|" + data['resource'][8:] + "|" + data['timestamp'][0:23] + "|" + str(data['B.STATE.V']) + "\n")
             if ('B.STATE.I' in data.keys()):
-                currentTable.write(log['hostName'][i] + "|" + data['resource'] + "|" + data['timestamp'] + "|" + str(data['B.STATE.I']) + "\n")
+                currentTable.write(log['hostName'][i] + "|" + data['resource'][8:] + "|" + data['timestamp'][0:23] + "|" + str(data['B.STATE.I']) + "\n")
             if ('B.STATE.ETMP' in data.keys()):
-                tempTable.write(log['hostName'][i] + "|" + data['resource'] + "|" + data['timestamp'] + "|" + str(data['B.STATE.ETMP']) + "\n")
+                tempTable.write(log['hostName'][i] + "|" + data['resource'][8:] + "|" + data['timestamp'][0:23] + "|" + str(data['B.STATE.ETMP']) + "\n")
             if ('B.STATE.CHRG' in data.keys()):
-                capacityTable.write(log['hostName'][i] + "|" + data['resource'] + "|" + data['timestamp'] + "|" + str(data['B.STATE.CHRG']) + "\n")
+                capacityTable.write(log['hostName'][i] + "|" + data['resource'][8:] + "|" + data['timestamp'][0:23] + "|" + str(data['B.STATE.CHRG']) + "\n")
 """
 Loops through each csv file provided on the command line and passes each file
 to the parser
