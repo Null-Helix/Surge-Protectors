@@ -26,13 +26,13 @@ def parseLog(log_file, tempTable, voltageTable, currentTable, capacityTable):
         PerfData = loads(log['description'][i])['PerfData']
         for data in PerfData:
             if ('B.STATE.V' in data.keys()):
-                voltageTable.write(log['hostName'][i] + "|" + data['resource'][8:] + "|" + data['timestamp'][0:23] + "|" + str(data['B.STATE.V']) + "\n")
+                voltageTable.write(log['hostName'][i] + "," + data['resource'][8:] + "," + data['timestamp'][0:23] + "," + str(data['B.STATE.V']) + "\n")
             if ('B.STATE.I' in data.keys()):
-                currentTable.write(log['hostName'][i] + "|" + data['resource'][8:] + "|" + data['timestamp'][0:23] + "|" + str(data['B.STATE.I']) + "\n")
+                currentTable.write(log['hostName'][i] + "," + data['resource'][8:] + "," + data['timestamp'][0:23] + "," + str(data['B.STATE.I']) + "\n")
             if ('B.STATE.ETMP' in data.keys()):
-                tempTable.write(log['hostName'][i] + "|" + data['resource'][8:] + "|" + data['timestamp'][0:23] + "|" + str(data['B.STATE.ETMP']) + "\n")
+                tempTable.write(log['hostName'][i] + "," + data['resource'][8:] + "," + data['timestamp'][0:23] + "," + str(data['B.STATE.ETMP']) + "\n")
             if ('B.STATE.CHRG' in data.keys()):
-                capacityTable.write(log['hostName'][i] + "|" + data['resource'][8:] + "|" + data['timestamp'][0:23] + "|" + str(data['B.STATE.CHRG']) + "\n")
+                capacityTable.write(log['hostName'][i] + "," + data['resource'][8:] + "," + data['timestamp'][0:23] + "," + str(data['B.STATE.CHRG']) + "\n")
 """
 Loops through each csv file provided on the command line and passes each file
 to the parser
@@ -41,10 +41,10 @@ def main(argv):
     if len(argv) < 2:
         print('Usage: python log_parser.py <path to log files>', file=sys.stderr)
         sys.exit(1)
-    tempTable = open("tempTable.dat", "w")
-    voltageTable = open("voltageTable.dat", "w")
-    currentTable = open("currentTable.dat", "w")
-    capacityTable = open("capacityTable.dat", "w")
+    tempTable = open("tempTable.csv", "w")
+    voltageTable = open("voltageTable.csv", "w")
+    currentTable = open("currentTable.csv", "w")
+    capacityTable = open("capacityTable.csv", "w")
     for f in argv[1:]:
         if isLog(f):
             parseLog(f, tempTable, voltageTable, currentTable, capacityTable)
