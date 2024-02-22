@@ -3,7 +3,7 @@ FILE: log_parser.py
 ------------------
 Author: Joshua Kercher
 
-Log parser for GE HealthCare battery logs. Creates four .dat files with schema "hostName, device, timestamp, temp/voltage/current/capacity"
+Log parser for GE HealthCare battery logs. Creates four .csv files with schema "hostName, device, timestamp, temp/voltage/current/capacity"
 Command line useage: "python3 log_parser.py <log file name>"
 
 """
@@ -39,7 +39,7 @@ to the parser
 """
 def main(argv):
     if len(argv) < 2:
-        print('Usage: python log_parser.py <path to log files>', file=sys.stderr)
+        print('Usage: python3 log_parser.py <path to log files>', file=sys.stderr)
         sys.exit(1)
     tempTable = open("tempTable.csv", "w")
     voltageTable = open("voltageTable.csv", "w")
