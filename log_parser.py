@@ -3,8 +3,8 @@ FILE: log_parser.py
 ------------------
 Author: Joshua Kercher
 
-Log parser for GE HealthCare battery logs. Creates four .csv files with schema "hostName, device, timestamp, temp/voltage/current/capacity"
-Command line useage: "python3 log_parser.py <log file name>"
+Log parser for GE HealthCare battery logs. Creates a .csv file with schema "hostName, device, timestamp, temp, voltage, current, capacity"
+Command line useage: "python log_parser.py <log file name>"
 
 """
 import sys
@@ -19,40 +19,54 @@ def isLog(f):
 """
 Parses a single csv file, adding entries to .dat files as it progresses.
 """
-def parseLog(log_file, tempTable, voltageTable, currentTable, capacityTable):
+def parseLog(log_file, table):
     log = pd.read_csv(log_file)
     log = log[log['eventCategory'] == 'PerfData'].reset_index()
     for i in range(log.shape[0]):
         PerfData = loads(log['description'][i])['PerfData']
         for data in PerfData:
             if ('B.STATE.V' in data.keys()):
-                voltageTable.write(log['hostName'][i] + "," + data['resource'][8:] + "," + data['timestamp'][0:23] + "," + str(data['B.STATE.V']) + "\n")
+                key = (log['hostName'][i], data['resource'][8:], data['timestamp'][0:23])
+                if key not in table:
+                    table[key] = {'hostName': log['hostName'][i], 'device': data['resource'][8:], 'timestamp': data['timestamp'][0:23], 
+                                  'temp': None, 'voltage': None, 'current': None, 'capacity': None}
+                table[key]['voltage'] = data['B.STATE.V']
             if ('B.STATE.I' in data.keys()):
-                currentTable.write(log['hostName'][i] + "," + data['resource'][8:] + "," + data['timestamp'][0:23] + "," + str(data['B.STATE.I']) + "\n")
+                key = (log['hostName'][i], data['resource'][8:], data['timestamp'][0:23])
+                if key not in table:
+                    table[key] = {'hostName': log['hostName'][i], 'device': data['resource'][8:], 'timestamp': data['timestamp'][0:23], 
+                                  'temp': None, 'voltage': None, 'current': None, 'capacity': None}
+                table[key]['current'] = data['B.STATE.I']
             if ('B.STATE.ETMP' in data.keys()):
-                tempTable.write(log['hostName'][i] + "," + data['resource'][8:] + "," + data['timestamp'][0:23] + "," + str(data['B.STATE.ETMP']) + "\n")
+                key = (log['hostName'][i], data['resource'][8:], data['timestamp'][0:23])
+                if key not in table:
+                    table[key] = {'hostName': log['hostName'][i], 'device': data['resource'][8:], 'timestamp': data['timestamp'][0:23], 
+                                  'temp': None, 'voltage': None, 'current': None, 'capacity': None}
+                table[key]['temp'] = data['B.STATE.ETMP']
             if ('B.STATE.CHRG' in data.keys()):
-                capacityTable.write(log['hostName'][i] + "," + data['resource'][8:] + "," + data['timestamp'][0:23] + "," + str(data['B.STATE.CHRG']) + "\n")
+                key = (log['hostName'][i], data['resource'][8:], data['timestamp'][0:23])
+                if key not in table:
+                    table[key] = {'hostName': log['hostName'][i], 'device': data['resource'][8:], 'timestamp': data['timestamp'][0:23], 
+                                  'temp': None, 'voltage': None, 'current': None, 'capacity': None}
+                table[key]['capacity'] = data['B.STATE.CHRG']
 """
 Loops through each csv file provided on the command line and passes each file
 to the parser
 """
 def main(argv):
     if len(argv) < 2:
-        print('Usage: python3 log_parser.py <path to log files>', file=sys.stderr)
+        print('Usage: python log_parser.py <path to log files>', file=sys.stderr)
         sys.exit(1)
-    tempTable = open("tempTable.csv", "w")
-    voltageTable = open("voltageTable.csv", "w")
-    currentTable = open("currentTable.csv", "w")
-    capacityTable = open("capacityTable.csv", "w")
+    table = {}
     for f in argv[1:]:
         if isLog(f):
-            parseLog(f, tempTable, voltageTable, currentTable, capacityTable)
+            parseLog(f, table)
             print("Success parsing " + f)
-    tempTable.close()
-    voltageTable.close()
-    currentTable.close()
-    capacityTable.close()
+    batteryTable = open('batteryTable.csv', 'w')
+    batteryTable.write(','.join(['hostName', 'device', 'timestamp', 'temperature', 'voltage', 'current', 'capacity']) + '\n')
+    for line in table.values():
+        batteryTable.write(','.join([line['hostName'], line['device'], line['timestamp'], str(line['temp']), str(line['voltage']), str(line['current']), str(line['capacity'])]) + '\n')
+    batteryTable.close()
 
 if __name__ == '__main__':
     main(sys.argv)
