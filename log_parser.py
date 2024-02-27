@@ -67,7 +67,8 @@ def main(argv):
     batteryTable.write(','.join(['hostName', 'device', 'timestamp', 'temperature', 'voltage', 'current', 'capacity']) + '\n')
     for line in table.values():
         new_line = ','.join([line['hostName'], line['device'], line['timestamp'], str(line['temp']), str(line['voltage']), str(line['current']), str(line['capacity'])]) + '\n'
-        batteryTable.write(new_line)
+        if None not in new_line:
+            batteryTable.write(new_line)
     batteryTable.close()
 
 if __name__ == '__main__':
