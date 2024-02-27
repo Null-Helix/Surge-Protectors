@@ -5,6 +5,7 @@ Author: Joshua Kercher
 
 Log parser for GE HealthCare battery logs. Creates a .csv file with schema "hostName, device, timestamp, temp, voltage, current, capacity"
 Command line useage: "python log_parser.py <log file name>"
+To run parser on multiple files: "python log_parser.py <folder name with log files>/*"
 
 """
 import sys
@@ -65,7 +66,8 @@ def main(argv):
     batteryTable = open('batteryTable.csv', 'w')
     batteryTable.write(','.join(['hostName', 'device', 'timestamp', 'temperature', 'voltage', 'current', 'capacity']) + '\n')
     for line in table.values():
-        batteryTable.write(','.join([line['hostName'], line['device'], line['timestamp'], str(line['temp']), str(line['voltage']), str(line['current']), str(line['capacity'])]) + '\n')
+        new_line = ','.join([line['hostName'], line['device'], line['timestamp'], str(line['temp']), str(line['voltage']), str(line['current']), str(line['capacity'])]) + '\n'
+        batteryTable.write(new_line)
     batteryTable.close()
 
 if __name__ == '__main__':
