@@ -14,18 +14,20 @@ When you save the notebook, an HTML file containing the code and output will be 
 The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
 
 Package Installation:
-  - If this is the first time you are running this Rmd file and you do not have the dplyr, jsonlite, ggplot2, tidyr library installed, uncomment the first four line and run the R chunk.
-  - Remember to comment out the first four line again after you have installed dplyr, jsonlite, ggplot2, tidyr into your RStudio environment.
+  - If this is the first time you are running this Rmd file and you do not have the dplyr, jsonlite, ggplot2, tidyr, lubridate library installed, uncomment the first four line and run the R chunk.
+  - Remember to comment out the first five line again after you have installed dplyr, jsonlite, ggplot2, tidyr, lubridate into your RStudio environment.
 
 ```{r}
 # install.packages("dplyr")
 # install.packages("ggplot2")
 # install.packages("jsonlite")
 # install.packages("tidyr")
+# install.packages("lubridate")
 library(dplyr)
 library(ggplot2)
 library(jsonlite)
 library(tidyr)
+library(lubridate)
 ```
 
 ## Processing Raw Data File(Filtering and Expanding)
@@ -334,6 +336,25 @@ head(instance_df)
 
 ```
 
+According to the Axone Logging Interface Spec states that the timestamp: is the actual time the measurements where taken and may not be the same values as the "Datestamp+Timestamp". 
+
+```{r}
+
+instance_df$timestamp <- as.POSIXct(instance_df$timestamp, format = "%Y-%m-%dT%H:%M:%OS")
+
+instance_df$year <- year(instance_df$timestamp)
+instance_df$month <- month(instance_df$timestamp)
+instance_df$day <- day(instance_df$timestamp)
+instance_df$hour <- hour(instance_df$timestamp)
+instance_df$minute <- minute(instance_df$timestamp)
+instance_df$second <- second(instance_df$timestamp)
+instance_df$millisecond <- round(as.numeric(format(instance_df$timestamp, "%OS3")), 3) 
+instance_df$timezone <- tz(instance_df$timestamp)
+
+head(instance_df)
+
+```
+
 ## Conclusion
 
 This concludes the data transformation. Here are some notes for future parsing and data cleaning:
@@ -394,14 +415,57 @@ print(most_frequent_host)
 
 For evaluation of hostName: 44-4b-5d-01-04-21, a couple of assumptions will be established. Hopefully, these assumptions will become less strict as the analysis progresses. 
 
-Assumptions:
-  - Each host has 2 RESPSENSOR and 2 SPO2SENSOR and 1 HUB battery
-  - These batteries do not move around between hosts
-  - Batteries can not be uniquely identified(Future inference on voltage, current, etc. trends will hopefully show a system that can uniquely identify these batteries)
-  
+### Assumptions
 
-  
+- Each host has 2 RESPSENSOR and 2 SPO2SENSOR and 1 HUB battery.
+- These batteries do not move around between hosts.
+- Batteries cannot be uniquely identified. Future inference on voltage, current, etc. trends will hopefully show a system that can uniquely identify these batteries.
+
+
+
 Plotting HUB batteries voltage for hostname: 44-4b-5d-01-04-21, under the assumption that only 1 exists for this hostname. If such assumptions can be treated truthfully, the trend should follow consistently.
   
 ```{r}
+
+host_hub_instances <- instance_df %>%
+  filter(hostName == "44-4b-5d-01-04-21", hardwareIdentifier == "HUB")
+
+host_hub_instances$timestamp <- as.POSIXct(host_hub_instances$timestamp)
+
+ggplot(host_hub_instances, aes(x = timestamp, y = B.STATE.V)) +
+  geom_point() + 
+  labs(x = "Timestamp", y = "Voltage") +
+  ggtitle("Voltage vs Timestamp")
+
 ```
+
+The plot shows unexpected behavior from plotting the voltages of the HUB battery over the timestamps. This could be caused by the fact that the previous assumption that there is only HUB battery associated with each host is incorrect. A closer look into the data reveals a possible fix to the strange pattern shown above.
+
+```{r}
+
+head(host_hub_instances, 25)
+
+```
+
+Notice that for rows with a NA in one of the columns(B.STATE.V, B.STATE.I, B.STATE.ETMP, and B.STATE.CHRG), the row below it has a non-NA value for the same column. Moreover, the timestamp associated with both these rows are exactly the same. It is possible, that when logging the information, statistics relating to the same battery were placed in two separate PerfData JSONs.
+
+The code below checks whether the number of non-NA values in each column(B.STATE.V, B.STATE.I, B.STATE.ETMP, and B.STATE.CHRG) is equal. Then it checks whether there are not more than 1 consecutive NA values within one column.
+
+```{r}
+
+cat("Number of non-NAs in B.STATE.V:",sum(!is.na(host_hub_instances$B.STATE.V)), "\n")
+cat("Number of non-NAs in B.STATE.I:",sum(!is.na(host_hub_instances$B.STATE.I)), "\n")
+cat("Number of non-NAs in B.STATE.ETMP:",sum(!is.na(host_hub_instances$B.STATE.ETMP)), "\n")
+cat("Number of non-NAs in B.STATE.CHRG:",sum(!is.na(host_hub_instances$B.STATE.CHRG)), "\n")
+
+has_consecutive_nas <- function(x) {
+  any(with(rle(is.na(x)), lengths > 1))
+}
+
+cat("Does B.STATE.V have consecutive NAs:",has_consecutive_nas(host_hub_instances$B.STATE.V), "\n")
+cat("Does B.STATE.I have consecutive NAs:",has_consecutive_nas(host_hub_instances$B.STATE.I), "\n")
+cat("Does B.STATE.ETMP have consecutive NAs:",has_consecutive_nas(host_hub_instances$B.STATE.ETMP), "\n")
+cat("Does B.STATE.CHRG have consecutive NAs:",has_consecutive_nas(host_hub_instances$B.STATE.CHRG), "\n")
+
+```
+The number of B.STATE.ETMP recordings is 1 less than the others. Each column has consecutive NAs. This is a problem!
