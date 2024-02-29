@@ -468,4 +468,38 @@ cat("Does B.STATE.ETMP have consecutive NAs:",has_consecutive_nas(host_hub_insta
 cat("Does B.STATE.CHRG have consecutive NAs:",has_consecutive_nas(host_hub_instances$B.STATE.CHRG), "\n")
 
 ```
-The number of B.STATE.ETMP recordings is 1 less than the others. Each column has consecutive NAs. This is a problem!
+The number of B.STATE.ETMP recordings is 1 less than the others. Each column has consecutive NAs. This is a problem! 
+
+NOTE: FURTHER ANALYSIS OF CONSECUTIVE NAs SHOULD BE DONE
+
+For now, an additional step to parsing could be added by merging the columns with the same timestamps. The code below does this:
+
+```{r}
+
+host_hub_clean <- host_hub_instances %>%
+  select(timestamp, B.STATE.V, B.STATE.I, B.STATE.ETMP, B.STATE.CHRG) %>%
+  group_by(timestamp) %>%
+  summarise(
+    B.STATE.V = ifelse(all(is.na(B.STATE.V)), NA, first(na.omit(B.STATE.V))),
+    B.STATE.I = ifelse(all(is.na(B.STATE.I)), NA, first(na.omit(B.STATE.I))),
+    B.STATE.ETMP = ifelse(all(is.na(B.STATE.ETMP)), NA, first(na.omit(B.STATE.ETMP))),
+    B.STATE.CHRG = ifelse(all(is.na(B.STATE.CHRG)), NA, first(na.omit(B.STATE.CHRG)))
+  ) %>%
+  ungroup()
+
+head(host_hub_clean)
+  
+```
+
+Plotting time against voltage for the HUB batteries again:
+
+```{r}
+
+ggplot(host_hub_clean, aes(x = timestamp, y = B.STATE.V)) +
+  geom_point() + 
+  labs(x = "Timestamp", y = "Voltage") +
+  ggtitle("Voltage vs Timestamp")
+
+```
+
+Welp....not sure how to explain this one tbh.
