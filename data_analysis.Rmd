@@ -422,24 +422,18 @@ For evaluation of hostName: 44-4b-5d-01-04-21, a couple of assumptions will be e
 - Batteries cannot be uniquely identified. Future inference on voltage, current, etc. trends will hopefully show a system that can uniquely identify these batteries.
 
 
+Filtering dataframe down to "HUB" battery instances from hostname:  44-4b-5d-01-04-21.
 
-Plotting HUB batteries voltage for hostname: 44-4b-5d-01-04-21, under the assumption that only 1 exists for this hostname. If such assumptions can be treated truthfully, the trend should follow consistently.
-  
 ```{r}
 
-host_hub_instances <- instance_df %>%
-  filter(hostName == "44-4b-5d-01-04-21", hardwareIdentifier == "HUB")
-
-host_hub_instances$timestamp <- as.POSIXct(host_hub_instances$timestamp)
-
-ggplot(host_hub_instances, aes(x = timestamp, y = B.STATE.V)) +
-  geom_point() + 
-  labs(x = "Timestamp", y = "Voltage") +
-  ggtitle("Voltage vs Timestamp")
+host_hub_instances = instance_df %>%
+  ungroup() %>%
+  filter(hostName == "44-4b-5d-01-04-21") %>%
+  select(-c(hardwareIdentifier, friendlyName, timeStampAndOffset, sourceUUID, hostName))
 
 ```
 
-The plot shows unexpected behavior from plotting the voltages of the HUB battery over the timestamps. This could be caused by the fact that the previous assumption that there is only HUB battery associated with each host is incorrect. A closer look into the data reveals a possible fix to the strange pattern shown above.
+A closer look into the data frame reveals a possible bug in the implementation of the file parser. This was not included in the parsing section earlier as the proposed solution is not well tested. Take a look at rows with NA values in the B.STATE.V, B.STATE.I, B.STATE.ETMP, and B.STATE.CHRG columns.
 
 ```{r}
 
@@ -447,9 +441,9 @@ head(host_hub_instances, 25)
 
 ```
 
-Notice that for rows with a NA in one of the columns(B.STATE.V, B.STATE.I, B.STATE.ETMP, and B.STATE.CHRG), the row below it has a non-NA value for the same column. Moreover, the timestamp associated with both these rows are exactly the same. It is possible, that when logging the information, statistics relating to the same battery were placed in two separate PerfData JSONs.
+Notice that for rows with a NA in one or more of the columns(B.STATE.V, B.STATE.I, B.STATE.ETMP, and B.STATE.CHRG), the row below or above it has a non-NA value for the same column. Moreover, the timestamp associated with both these rows are the same. It is possible, that a single batteries information was split between two separate PerfData JSONs.
 
-The code below checks whether the number of non-NA values in each column(B.STATE.V, B.STATE.I, B.STATE.ETMP, and B.STATE.CHRG) is equal. Then it checks whether there are not more than 1 consecutive NA values within one column.
+The code below checks whether the number of non-NA values in each column(B.STATE.V, B.STATE.I, B.STATE.ETMP, and B.STATE.CHRG) are equal. Then it checks whether there are not more than 1 consecutive NA values within one column.
 
 ```{r}
 
@@ -487,11 +481,16 @@ host_hub_clean <- host_hub_instances %>%
   ) %>%
   ungroup()
 
-head(host_hub_clean)
+head(host_hub_clean, 25)
   
 ```
 
-Plotting time against voltage for the HUB batteries again:
+Note: The assumption that there is exactly one Hub Battery associated to this hostname may be flawed. A potential solution that can be explored for associating different battery measures with a single battery instance is using an unsupervised clustering model. Where each measurement builds a point in 4-dimensional space and clusters grow from time stamp to timestamp by finding the closest distance between points.
+
+
+Initial Plotting of All Data over all Timestamps:
+
+1) Plotting Voltage over all Timestamps
 
 ```{r}
 
@@ -502,4 +501,59 @@ ggplot(host_hub_clean, aes(x = timestamp, y = B.STATE.V)) +
 
 ```
 
-Welp....not sure how to explain this one tbh.
+2) Plotting Current over all Timestamps
+
+```{r}
+
+ggplot(host_hub_clean, aes(x = timestamp, y = B.STATE.I)) +
+  geom_point() + 
+  labs(x = "Timestamp", y = "Current") +
+  ggtitle("Current vs Timestamp")
+
+```
+
+3) Plotting Charge over all Timestamps
+
+```{r}
+
+ggplot(host_hub_clean, aes(x = timestamp, y = B.STATE.CHRG)) +
+  geom_point() + 
+  labs(x = "Timestamp", y = "Charge") +
+  ggtitle("Charge vs Timestamp")
+
+```
+
+4) Plotting Temperature over all Timestamps
+
+```{r}
+
+ggplot(host_hub_clean, aes(x = timestamp, y = B.STATE.ETMP)) +
+  geom_point() + 
+  labs(x = "Timestamp", y = "Temperature") +
+  ggtitle("Temperature vs Timestamp")
+
+```
+
+It is difficult to see a clear trend here. There is probably an issue with the combination code(forming host_hub_clean dataframe).
+
+A more interesting approach is to look at shorter periods of time rather than all the timestamps at once. There may be a pattern that occurs is a short period of time that is lost in the plotting.
+
+
+##### Approach 2: Analyzing plots over shorter periods of time
+
+```{r}
+
+host_hub_clean_1_day <- host_hub_instances %>%
+  filter(year == 2022, day == 27, hour == 2, minute == 1, second %in% c(1:50))
+
+ggplot(host_hub_clean_1_day, aes(x = timestamp, y = B.STATE.V)) +
+  geom_point() + 
+  labs(x = "Timestamp", y = "Voltage") +
+  ggtitle("Voltage vs Timestamp")
+  
+```
+
+
+
+
+
