@@ -32,7 +32,8 @@ function App() {
   const stats = [
     {value: 'Temperature', label: 'Temperature'},
     {value: 'Capacity', label: 'Capacity'},
-    {value: 'Voltage', label: 'Voltage'}
+    {value: 'Voltage', label: 'Voltage'},
+    {value: 'Current', label: 'Current'},
   ]
   document.body.style.backgroundColor="#640acc"
   return (
