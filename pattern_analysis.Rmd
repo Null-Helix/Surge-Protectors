@@ -1,0 +1,580 @@
+---
+title: "Data Analysis"
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: inline
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+Package Installation:
+  - If this is the first time you are running this Rmd file and you do not have the dplyr, jsonlite, ggplot2, tidyr, lubridate, readr library installed, uncomment the first six lines and run the R chunk.
+  - Remember to comment out the first six line again after you have installed dplyr, jsonlite, ggplot2, tidyr, lubridate, readr into your RStudio environment.
+
+```{r}
+# install.packages("dplyr")
+# install.packages("ggplot2")
+# install.packages("jsonlite")
+# install.packages("tidyr")
+# install.packages("lubridate")
+# install.packages(readr)
+# install.packages(car)
+library(dplyr)
+library(ggplot2)
+library(jsonlite)
+library(tidyr)
+library(lubridate)
+library(readr)
+library(car)
+```
+
+Reading all battery log data into dataframe:
+
+```{r}
+df = read_csv("BatteryTableAllLogs.csv")
+head(df)
+```
+
+Minor additional pre-processing of parsed log data to seperate date information.
+
+```{r}
+
+df$timestamp <- as.POSIXct(df$timestamp, format = "%Y-%m-%dT%H:%M:%OS")
+
+df$year <- year(df$timestamp)
+df$month <- month(df$timestamp)
+df$day <- day(df$timestamp)
+df$hour <- hour(df$timestamp)
+df$minute <- minute(df$timestamp)
+df$second <- second(df$timestamp)
+df$millisecond <- round(as.numeric(format(df$timestamp, "%OS3")), 3) 
+df$timezone <- tz(df$timestamp)
+
+head(df)
+
+```
+
+This is a recommended change for the parsing as it can help with faster analysis, but it is not required.
+
+## Checking for Abnormal Capacity Behavior
+
+Checking for NA capacities:
+
+```{r}
+sum(is.na(df$capacity))
+```
+
+No NA capacities found.
+
+Check for Minimum and Maximum capacities.
+
+```{r}
+cat("Min Capacity:", min(df$capacity), "\n")
+cat("Max Capacity:", max(df$capacity), "\n")
+```
+
+Capacities are between 0 to 100 which is expected behavior.
+
+
+## Exploring Voltage - Capacity Trends
+
+To start this analysis, we narrow down the battery logs to data sent from SPO2SENSOR devices from hostName: 44-4b-5d-01-04-21:
+
+```{r}
+spo2_host_hub_df = df %>%
+  filter(hostName == "44-4b-5d-01-04-21", device == "SPO2SENSOR")
+
+head(spo2_host_hub_df)
+```
+
+The following is an initial plotting of both the voltage and capacity trends over time. 
+
+```{r}
+
+par(mfrow = c(1, 2))
+
+voltage_trend = ggplot(spo2_host_hub_df, aes(x = timestamp)) + 
+  geom_line(aes(y = voltage), color = "darkred")  
+
+capacity_trend = ggplot(spo2_host_hub_df, aes(x = timestamp)) + 
+  geom_line(aes(y = capacity), color = "steelblue") 
+
+voltage_trend
+capacity_trend
+  
+```
+
+The visual comparison between both time series reveal a high correlation. Voltage and Capacity have very similar trends. The code below checks the correlation between the two:
+
+```{r}
+cor(spo2_host_hub_df$capacity, spo2_host_hub_df$voltage)
+```
+
+There is a 99.7% correlation which indivate that they are highly correlated.
+
+## Linear Regression
+
+Intuition: If we train a linear regression model to predict the expected voltage for each capacity on all the data, we can visualize and evaluate deviating behavior. Training on all the data, ie, minimizing the loss on all the data will give us the overall capacity to voltage relationship(1). 
+
+In the section below we see that voltages for the max capacity differ which suggests that the actual voltages associated to each capacity deviates based on device use and the hub. Comparing the predicted(which we can assume is the expected) voltages to each capacity value to the actual voltage could provide insight into the overall performance of the portrait mobile system(2) and provide insight into how usage effects voltage(3). For (3), we are interested in factors like how long a battery is in use(how long the capacity is decreasing) and what device the battery is used in(for now just SPO2 and RESP).
+
+Before I get ahead of myself(which I probably already have), lets build the linear regression model on all the data(excluding HUB, since from my understanding has quite volatile behavior).
+
+Building a simple model to predict voltage from capacity on all log data not from HUB batteries:
+
+```{r}
+
+df_filtered <- df %>%
+  filter(device != "HUB")
+
+model <- lm(voltage ~ capacity, data = df_filtered)
+
+summary(model)
+
+```
+Observations:
+  * The R-squared is 0.9392 so the regression model fits the data very well, which is expected given the high correlation we found in the section earlier. This means that roughly 94% of the variance in voltage is predictable from capacity. Note this also means that there will only be roughly 6% of unpredictable behavior in the voltages
+  * The p-value is extremely small, so the coefficients are statistically significant and not just because the log data that we have is lucky.
+  
+Now, lets plot the predictions of the linear regression model onto the voltage over time graph we did earlier for the SPO2SENSOR device from hub: 44-4b-5d-01-04-21
+
+```{r}
+spo2_host_hub_df$predicted_voltage <- predict(model, newdata = spo2_host_hub_df)
+
+voltage_trend <- ggplot(spo2_host_hub_df, aes(x = timestamp)) +
+  geom_line(aes(y = voltage), color = "darkred") +
+  geom_line(aes(y = predicted_voltage), color = "blue") +
+  geom_ribbon(aes(ymin = pmin(voltage, predicted_voltage), ymax = pmax(voltage, predicted_voltage)), fill = "red", alpha = 0.5) +
+  labs(title = "Voltage Over Time with Linear Regression Model") +
+  theme_minimal()
+
+voltage_trend
+```
+
+Note that even though this is a predictive model trained on all the data, we will assume that this is the true voltage we should get given the capacity that the battery currently has. Lets calculate the net difference between the expected and the actual for the SPO2 devices from hub: 44-4b-5d-01-04-21
+
+```{r}
+spo2_host_hub_df$difference <- abs(spo2_host_hub_df$voltage - spo2_host_hub_df$predicted_voltage)
+cat("Net Difference in Voltage:", sum(spo2_host_hub_df$difference))
+```
+
+This seems like a lot of difference in voltage. But it opens a new avenue for analysis: we can now compute how different the voltage is associated to different usages of the battery. Lets start with how long a battery is being used(periods of decreasing capacity).
+
+After looking through the data, I found that all the log data measures record decreasing values. A scatter plot better captures this relationship:
+
+```{r}
+voltage_trend = ggplot(spo2_host_hub_df, aes(x = timestamp)) + 
+  geom_point(aes(y = voltage), color = "darkred")  
+
+capacity_trend = ggplot(spo2_host_hub_df, aes(x = timestamp)) + 
+  geom_point(aes(y = capacity), color = "steelblue") 
+
+voltage_trend
+capacity_trend
+```
+Lets overlay the linear regression model predictions onto the voltage over time plot.
+
+```{r}
+voltage_trend = ggplot(spo2_host_hub_df, aes(x = timestamp)) + 
+  geom_point(aes(y = voltage), color = "darkred") +
+  geom_point(aes(y = predicted_voltage), color = "blue")
+
+voltage_trend
+```
+
+Observation:
+  * This trends are difficult to see. But one possible interpretation is that the voltages of the batteries at the beginning of their cycle(when capacity is maximum) is higher than expected. But, as the battery is being used(the capacity decreases), the voltages drops faster than the expected.
+  
+Lets look at a smaller time period.
+
+```{r}
+spo2_day = spo2_host_hub_df %>%
+  filter(month==9, day == 27)
+
+voltage_trend = ggplot(spo2_day, aes(x = timestamp)) + 
+  geom_point(aes(y = voltage), color = "red") +
+  geom_point(aes(y = predicted_voltage), color = "blue")
+
+voltage_trend
+
+```
+  
+Smaller time periods really help visualize the true pattern. The next step is to find how long a battery is discharging for a given cycle. To do this we need to cluster the periods of decreasing capacity. Unfortunately, after multiple attempts, clustering within a time period has proven to be quite difficult. So instead, I manually clustered periods by breaking up two periods everytime the voltage jumps more than 5 volts from the previous timestamp.
+
+```{r}
+spo2_host_hub_df$jump_cluster <- 0
+
+for (i in 2:nrow(spo2_host_hub_df)) {
+  if (spo2_host_hub_df$voltage[i] > spo2_host_hub_df$voltage[i - 1] + 5) {
+    spo2_host_hub_df$jump_cluster[i] <- spo2_host_hub_df$jump_cluster[i - 1] + 1
+  } else {
+    spo2_host_hub_df$jump_cluster[i] <- spo2_host_hub_df$jump_cluster[i - 1]
+  }
+}
+
+ggplot(spo2_host_hub_df, aes(x = timestamp, y = voltage, color = factor(jump_cluster))) +
+  geom_line() +
+  labs(x = "Timestamp", y = "Voltage", color = "Jump Cluster") +
+  theme_minimal()
+
+```
+We found 8 clusters, ie, periods of consecutive decreasing voltage with no increasing jumpts greater than 5 volts. Note, this may not be the most accurate way to find discharging time periods. Visually, we would expect 9 clusters, so 1 is missing. 
+
+Lets take a look at a smaller time period with these clusters.
+
+```{r}
+spo2_day <- spo2_host_hub_df %>%
+  filter(month == 9, day == 29)
+
+voltage_trend <- ggplot(spo2_day, aes(x = timestamp)) + 
+  geom_point(aes(y = voltage, color = factor(jump_cluster))) +
+  geom_point(aes(y = predicted_voltage), color = "red") +
+  labs(x = "Timestamp", y = "Voltage", color = "Jump Cluster")
+
+voltage_trend
+```
+
+Lets look at the different lengths of time each decreasing period was:
+
+```{r}
+
+cluster_lengths <- spo2_host_hub_df %>%
+  group_by(jump_cluster) %>%
+  summarize(
+  #  cluster_length_secs = difftime(max(timestamp), min(timestamp), units = "secs"),
+    cluster_length_mins = difftime(max(timestamp), min(timestamp), units = "mins"),
+ #   cluster_length_hours = difftime(max(timestamp), min(timestamp), units = "hours"), 
+    sum_abs_diff = sum(abs(difference), na.rm = TRUE)
+  )
+
+cluster_lengths
+
+```
+Lets see the relationship between the length of the time the battery is being used and the discrepency between expected and actual voltage.
+
+```{r}
+ggplot(cluster_lengths, aes(x = cluster_length_secs, y = sum_abs_diff, label = as.character(jump_cluster))) +
+  geom_point() +
+  geom_text(vjust = -0.5, size = 3) + 
+  labs(x = "Cluster Length (seconds)", y = "Sum of Absolute Difference") +
+  theme_minimal()
+```
+
+## Voltage Descrepencies across Varying Time Periods for All Devices
+
+In this section, we expand upon the previous section but perform the analysis across devices from every HUB.
+
+Lets start with SPO2SENSOR devices:
+
+```{r}
+
+spo2_devices = df %>%
+  filter(device == "SPO2SENSOR")
+
+spo2_devices$predicted_voltage <- predict(model, newdata = spo2_devices)
+
+spo2_devices <- spo2_devices %>%
+  mutate(difference = voltage - predicted_voltage)
+
+spo2_devices$jump_cluster <- 0
+
+unique_hosts <- unique(spo2_devices$hostName)
+for (host in unique_hosts) {
+  host_data <- spo2_devices[spo2_devices$hostName == host, ]
+  
+  for (i in 2:nrow(host_data)) {
+    if (host_data$voltage[i] > host_data$voltage[i - 1] + 5) {
+      host_data$jump_cluster[i] <- host_data$jump_cluster[i - 1] + 1
+    } else {
+      host_data$jump_cluster[i] <- host_data$jump_cluster[i - 1]
+    }
+  }
+  
+  spo2_devices[spo2_devices$hostName == host, ]$jump_cluster <- host_data$jump_cluster
+}
+
+cluster_lengths <- spo2_devices %>%
+  group_by(hostName, jump_cluster) %>%
+  summarize(
+    cluster_length_secs = difftime(max(timestamp), min(timestamp), units = "secs"),
+    cluster_length_mins = difftime(max(timestamp), min(timestamp), units = "mins"),
+    cluster_length_hours = difftime(max(timestamp), min(timestamp), units = "hours"),
+    sum_abs_diff = sum(abs(difference), na.rm = TRUE)
+  )
+
+head(cluster_lengths)
+  
+```
+
+```{r}
+ggplot(cluster_lengths, aes(x = cluster_length_secs, y = sum_abs_diff, color = hostName, label = as.character(jump_cluster))) +
+  geom_point() +
+  geom_text(vjust = -0.5, size = 3) + 
+  labs(x = "Cluster Length (seconds)", y = "Sum of Absolute Difference") +
+  theme_minimal()
+```
+
+Average Change out time:
+
+```{r}
+mean(cluster_lengths$cluster_length_mins)
+```
+
+Now for RESPSENSOR devices:
+
+```{r}
+
+resp_devices = df %>%
+  filter(device == "RESPSENSOR")
+
+resp_devices$predicted_voltage <- predict(model, newdata = resp_devices)
+
+resp_devices <- resp_devices %>%
+  mutate(difference = voltage - predicted_voltage)
+
+resp_devices$jump_cluster <- 0
+
+unique_hosts <- unique(resp_devices$hostName)
+for (host in unique_hosts) {
+  host_data <- resp_devices[resp_devices$hostName == host, ]
+  
+  for (i in 2:nrow(host_data)) {
+    if (host_data$voltage[i] > host_data$voltage[i - 1] + 5) {
+      host_data$jump_cluster[i] <- host_data$jump_cluster[i - 1] + 1
+    } else {
+      host_data$jump_cluster[i] <- host_data$jump_cluster[i - 1]
+    }
+  }
+  
+  resp_devices[resp_devices$hostName == host, ]$jump_cluster <- host_data$jump_cluster
+}
+
+cluster_lengths <- resp_devices %>%
+  group_by(hostName, jump_cluster) %>%
+  summarize(
+    cluster_length_secs = difftime(max(timestamp), min(timestamp), units = "secs"),
+    cluster_length_mins = difftime(max(timestamp), min(timestamp), units = "mins"),
+    cluster_length_hours = difftime(max(timestamp), min(timestamp), units = "hours"),
+    sum_abs_diff = sum(abs(difference), na.rm = TRUE)
+  )
+
+head(cluster_lengths)
+  
+```
+
+```{r}
+ggplot(cluster_lengths, aes(x = cluster_length_secs, y = sum_abs_diff, color = hostName, label = as.character(jump_cluster))) +
+  geom_point() +
+  geom_text(vjust = -0.5, size = 3) + 
+  labs(x = "Cluster Length (seconds)", y = "Sum of Absolute Difference") +
+  theme_minimal()
+```
+
+Average Change out time:
+
+```{r}
+mean(cluster_lengths$cluster_length_mins)
+```
+
+#### Exploring 100% Capacity Voltages:
+
+The battery log data sent from SPO2SENSOR devices from hostName: 44-4b-5d-01-04-21 will be used for this exploration. Filtering down to battery logs with 100 capacity:
+
+```{r}
+spo2_max_voltages = spo2_host_hub_df %>%
+  filter(capacity == 100)
+head(spo2_max_voltages)
+cat("Number of Occurrences of 100 Capacity:", length(spo2_max_voltages))
+```
+
+There are only 17 occurrences of 100 capacity in this subset of log data. Lets look at the distribution of the voltages when at 100 capacity:
+
+```{r}
+boxplot(spo2_max_voltages$voltage)
+```
+
+The data is very normally distributed with a slight left skew. Lets confirm the normality of the voltages for the batteries at 100 capacity using a QQ plot.
+
+```{r}
+qqPlot(spo2_max_voltages$voltage)
+hist(spo2_max_voltages$voltage)
+```
+
+The QQ plot shows that a majority of this data falls within the blue region, suggesting a fairly normal shape. However, some of the points do not fall within this region. Furthermore, the histogram of the data does not fully support that the voltages at 100 capacity are normally distributed. This could be because there are not enough observations from this hostName. Expanding this exploration to the other hostNames will reveal more.
+
+Before moving on lets look at the median voltage as this may indicate a center point of a potentially normal distribution and could be compared with the marketed maximum voltage of the portrait mobile batteries. 
+
+```{r}
+mean(spo2_max_voltages$voltage)
+```
+
+#### RESPSENSOR Maximum Voltage Exploration
+
+Lets see if there is a similar maximum voltage for the RESPSENSOR batteries. Again, to start, we will look only into logs sent from hostName: 44-4b-5d-01-04-21.
+
+```{r}
+resp_host_hub_df = df %>%
+  filter(hostName == "44-4b-5d-01-04-21", device == "RESPSENSOR")
+
+head(resp_host_hub_df)
+```
+
+The same process of filtering down to batteries at max capacity then plotting the distribution of the voltages is done:
+
+```{r}
+resp_max_voltages = resp_host_hub_df %>%
+  filter(capacity == 100)
+
+boxplot(resp_max_voltages$voltage)
+```
+
+The box and whiskers plot once again reflects a fairly normal distribution with a slightly left skew. The center(median) is lower and overall the spread seems to be at a slightly smaller voltage. Lets check the QQPlot and histogram again:
+
+```{r}
+qqPlot(resp_max_voltages$voltage)
+hist(resp_max_voltages$voltage)
+```
+
+The QQ plot shows a lot more evidence suggesting that the max voltages are not normally distributed. The also does not reflect a normal distribution shape.
+
+#### Comparing all Max Voltage Distributions
+
+Plotting the max voltages of the SPO2SENSOR devices from all the hosts.
+
+```{r}
+
+spo2_max_capacity_df <- df %>%
+  filter(capacity == 100, device == "SPO2SENSOR")
+
+ggplot(spo2_max_capacity_df, aes(x = hostName, y = voltage)) +
+  geom_boxplot() +
+  labs(title = "Boxplots of Voltage by HostName for SPO2 Devices with Capacity 100") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Observations:
+  * The low outliers from hub: 44-4b-5d-01-04-79(the fourth from the right) could potentially indicate a defective SPO2 battery where it is unable to charge up to the expected max voltage.
+  * The max voltages for some hubs like hub: 44-4b-5d-01-04-01(The one on the very left) is very skewed and do not resemble a normal. (Further Analysis must be Done to determine if this behavior is indicative of non-normalness in the data)
+  * Generally, the max voltages from SPO2 devices seem to fall into a fairly small range(4055-4090), which suggests that an expected behavior can be produced.
+
+Lets take a look at the average max voltage for the SPO2 devices across all the host names
+
+We will use a histogram and boxplot to evaluate the distribution of average max voltage for SPO2SENSOR devices across all host names:
+
+```{r}
+
+spo2_avg_max_voltages = spo2_max_capacity_df %>%
+  group_by(hostName) %>%
+  summarize(avg_max_voltage = median(voltage))
+
+hist(spo2_avg_max_voltages$avg_max_voltage)
+boxplot(spo2_avg_max_voltages$avg_max_voltage)
+qqPlot(spo2_avg_max_voltages$avg_max_voltage)
+
+```
+
+The spread of average max voltages for SPO2 devices across the host names is actually quite small. The histogram and QQ plot suggest that the average max voltages is not normally distributed. Lets numerically evaluate the spread:
+
+```{r}
+spo2_avg_range = range(spo2_avg_max_voltages$avg_max_voltage)
+cat("Range of Average Max Voltage for SPO2 Devices Across all HostNames:", spo2_avg_range[1], "-", spo2_avg_range[2], "\n")
+cat("The range covers:", spo2_avg_range[2] - spo2_avg_range[1],"values")
+```
+
+
+Lets do the same process for RESPSENSOR devices:
+
+1) Plotting distribution of Max Voltage for RESPSENSOR Devices
+
+```{r}
+
+resp_max_capacity_df <- df %>%
+  filter(capacity == 100, device == "RESPSENSOR")
+
+ggplot(resp_max_capacity_df, aes(x = hostName, y = voltage)) +
+  geom_boxplot() +
+  labs(title = "Boxplots of Voltage by HostName for RESP Devices with Capacity 100") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Observations:
+  * There are no outliers in any of the hosts which could possibly means that none of the RESP devices have defective batteries
+  * Visually it appears the spreads and means between hosts are farther apart which could indicate more volatile behavior in batteries connected to RESP devices. Notice that in host name: 44-4b-5d-01-04-81(the third from the right), the spread is oddly lower than the other hosts.
+  * Though it may look as if the spread of values of the max voltages for the RESP devices are wider, the scaling of the y-axis reveals that they are generally skinnier.
+  
+
+Getting distribution of mean max voltage across all host names for RESPSENSOR devices
+
+```{r}
+
+resp_avg_max_voltages = resp_max_capacity_df %>%
+  group_by(hostName) %>%
+  summarize(avg_max_voltage = mean(voltage))
+
+hist(resp_avg_max_voltages$avg_max_voltage)
+boxplot(resp_avg_max_voltages$avg_max_voltage)
+qqPlot(resp_avg_max_voltages$avg_max_voltage)
+
+```
+
+
+Observations:
+  * qqPlot and Histogram suggest more normal distribution of average max voltages of all hosts
+  * The Boxplot suggests that there is a larger range of averages between the hostName which would confirm the previous hypothesis that the spreads between hosts are farther apart.
+  
+Numerically evaluating range:
+
+```{r}
+resp_avg_range = range(resp_avg_max_voltages$avg_max_voltage)
+cat("Range of Average Max Voltage for SPO2 Devices Across all HostNames:", resp_avg_range[1], "-", resp_avg_range[2], "\n")
+cat("The range covers:", resp_avg_range[2] - resp_avg_range[1],"values")
+```
+
+Observations:
+  * The range of averages max voltages for RESP devices for all the hosts is indeed bigger than for SPO2 Devices
+  * Both ranges are centered around the samve values which is roughly: 4066-4078
+  
+#### Comparing SPO2 and RESP devices
+
+TLDR: The graphs evaluate RESP and SPO2 devices individually. This plot compares both. These boxplots are the distributions of max voltage(the voltage when capacity is 100), for every host name. It splits the max voltage measurements between the those that came from the RESP devices and those that came from the SPO2 devices.
+
+```{r}
+max_capacity_df <- df %>%
+  filter(capacity == 100, device != "HUB")
+
+ggplot(max_capacity_df, aes(x = hostName, y = voltage, fill = device)) +
+  geom_boxplot(position = "dodge") +
+  labs(title = "Boxplots of Voltage by HostName when Capacity 100 ") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+```
+
+Observations:
+  * There are multiple hubs with very different max voltages between RESP and SPO2 devices. Take a look at host: 44-4b-5d-01-04-39(6th from the right) and host: 44-4b-5d-01-04-51(5th from the right). In both the spread of the max voltages from the RESP devices are much higher than the SPO2 devices
+  * Visually, it appears that most of the max voltages from RESP devices are higher than the SPO2 devices
+
+Comparison plot of the distributions of average max voltages between RESP and SPO2 devices.
+
+```{r}
+resp_avg_max_voltages$device <- "RESPSENSOR"
+spo2_avg_max_voltages$device <- "SPO2SENSOR"
+
+combined_data <- bind_rows(resp_avg_max_voltages, spo2_avg_max_voltages)
+
+ggplot(combined_data, aes(x = device, y = avg_max_voltage, fill = device)) +
+  geom_boxplot() +
+  labs(title = "Boxplots of avg_max_voltage by Device Type") +
+  scale_fill_manual(values = c("RESPSENSOR" = "blue", "SPO2SENSOR" = "red"))
+
+```
+
+Observations:
+ * Again we see that the average max voltages for RESP devices cover a wider range than SPO2 sensors
+ * There is further evidence of the previous observation that RESP devices have a higher max voltage than SPO2 sensors. Notice that the maximum average max voltage for SPO2 is lower than the median of the average max voltage for the median.
