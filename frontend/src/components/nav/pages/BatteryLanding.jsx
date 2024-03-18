@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Button, Form } from 'react-bootstrap';
 import Select from 'react-select';
 // import BatteryDataContext from '../../contexts/BatteryDataContext';
 import {
@@ -14,14 +15,16 @@ import {
 } from 'recharts';
 
 export default function BatteryLanding() {
-  const [hostname, setHostname] = useState('44-4b-5d-01-04-29');
+  const [hostname, setHostname] = useState('44-4b-5d-01-04-19');
   const [device, setDevice] = useState('SPO2');
   const [stat, setStat] = useState('Temperature');
+  const [dischargeCycle, setDischargeCycle] = useState(1);
+  const [dischargeCycleToggle, setDischargeCycleToggle] = useState(false);
   const [batteryData, setBatteryData] = useState([]);
 
   async function getData() {
     try {
-      console.log('Data', hostname, device, stat);
+      console.log('Data', hostname, device, stat, dischargeCycle);
 
       const response = await fetch(
         `http://127.0.0.1:5001/hubinfo/${hostname}/${device}/${stat}`,
@@ -70,9 +73,9 @@ export default function BatteryLanding() {
     { value: '44-4b-5d-01-04-39', label: '44-4b-5d-01-04-39' },
   ];
   const devices = [
-    { value: 'HUB', label: 'Hub' },
     { value: 'SPO2', label: 'SPO2 Sensor' },
     { value: 'RESP', label: 'RESP Sensor' },
+    { value: 'HUB', label: 'Hub' }
   ];
   const stats = [
     { value: 'Temperature', label: 'Temperature' },
@@ -172,8 +175,28 @@ export default function BatteryLanding() {
                 }}
               ></Select>
             </div>
+            <div style={{ padding: 20, alignContent: 'center', width: 400 }}>
+              <Form>
+                <Form.Check onChange={() => setDischargeCycleToggle(!dischargeCycleToggle)} type="switch" label="Show Discharge Cycles"/>
+              </Form>
+            </div>
+            {dischargeCycleToggle ? 
+              <div style={{ padding: 20, alignContent: 'center', width: 175}}>
+                <Form>
+                  <Form.Group>
+                    <Form.Label>Discharge Cycle</Form.Label>
+                    <Form.Control defaultValue={1} onChange={e => setDischargeCycle(e.target.value)}></Form.Control>
+                  </Form.Group>
+                  <div style={{marginTop: 10}}>
+                    <Button onClick={() => getData()}>Submit</Button>
+                  </div>
+                </Form>
+              </div> :
+              <>
+              </>}
           </div>
           <div style={{ padding: 30, paddingTop: 100, marginLeft: 100 }}>
+                
             {/* {' '}
             <img
               src={
