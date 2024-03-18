@@ -191,13 +191,14 @@ export default function BatteryLanding() {
             ></img> */}
 
             {batteryData && batteryData.length > 0 && (
-              <LineChart data={batteryData} width={1000} height={400}>
+              <LineChart data={batteryData} width={1000} height={400} margin={{top: 5, right: 40, bottom: 20, left: 20}}>
                 <XAxis
                   dataKey='timestamp'
                   angle={-25}
                   tickFormatter={(value) =>
                     new Date(value).toLocaleDateString()
                   }
+                  tickSize={20}
                 />
                 <YAxis dataKey={stat.toLowerCase()} type='number' />
                 <CartesianGrid stroke='grey' strokeDasharray='5 5' />
