@@ -1,13 +1,20 @@
 import { FaSearch } from 'react-icons/fa';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 
-export const SearchBar = ({ setResults }) => {
+export const SearchBar = ({ setResults, clearResult }) => {
   const [input, setInput] = useState('');
 
   SearchBar.propTypes = {
     setResults: PropTypes.func.isRequired,
+    clearResult: PropTypes.any,
   };
+
+  console.log(clearResult);
+
+  useEffect(() => {
+    setInput('');
+  }, [clearResult]);
 
   const fetchData = (value) => {
     fetch('http://127.0.0.1:5001/hostnames')

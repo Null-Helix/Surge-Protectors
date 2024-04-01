@@ -1,5 +1,5 @@
 import { Container, Nav, Navbar } from 'react-bootstrap';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import GELogo from '../../assets/GELogo.png';
 import { SearchBar } from './pages/SearchBar';
@@ -7,6 +7,15 @@ import { SearchResultsList } from './pages/SearchResultsList';
 
 export default function BatteryNavBar() {
   const [results, setResults] = useState([]);
+  const [clearResult, setClearResult] = useState(false);
+
+  const clearSearchResults = () => {
+    setResults([]);
+  };
+
+  useEffect(() => {
+    clearSearchResults();
+  }, [setClearResult]);
 
   return (
     <>
@@ -39,10 +48,14 @@ export default function BatteryNavBar() {
             </Nav>
             <div className='mr-auto'>
               <div className='search-bar-container'>
-                <SearchBar setResults={setResults} />
+                <SearchBar setResults={setResults} clearResult={clearResult} />
                 <ul className='sub-menu'>
                   {results && results.length > 0 && (
-                    <SearchResultsList results={results} />
+                    <SearchResultsList
+                      results={results}
+                      clearResult={clearResult}
+                      setClearResult={setClearResult}
+                    />
                   )}
                 </ul>
               </div>

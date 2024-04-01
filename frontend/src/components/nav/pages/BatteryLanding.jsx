@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Button, Form } from 'react-bootstrap';
 import Select from 'react-select';
-// import BatteryDataContext from '../../contexts/BatteryDataContext';
 import {
   LineChart,
   ScatterChart,
   XAxis,
   YAxis,
   CartesianGrid,
+  ResponsiveContainer,
   Line,
   Scatter,
   Tooltip,
@@ -20,34 +20,99 @@ export default function BatteryLanding() {
   const [stat, setStat] = useState('Temperature');
   const [dischargeCycle, setDischargeCycle] = useState(1);
   const [dischargeCycleToggle, setDischargeCycleToggle] = useState(false);
+  const [minStat, setMinStat] = useState(0);
+  const [maxStat, setMaxStat] = useState(0);
   const [batteryData, setBatteryData] = useState([]);
+  const [plotImage, setPlotImage] = useState(null);
+  const [yLabel, setYLabel] = useState(null);
 
   async function getData() {
     try {
       console.log('Data', hostname, device, stat, dischargeCycle);
 
-      const response = await fetch(
-        `http://127.0.0.1:5001/hubinfo/${hostname}/${device}/${stat}`,
-        {
-          method: 'GET',
-        }
-      );
+      let url = `http://127.0.0.1:5001/hubinfo/${hostname}/${device}/${stat}`;
+
+      if (dischargeCycleToggle) {
+        console.log('Executed');
+        console.log('DischargeCycle', dischargeCycle);
+        url = `http://127.0.0.1:5001/hubinfo/${hostname}/${device}/${stat}/${dischargeCycle}`;
+      }
+
+      const response = await fetch(url, {
+        method: 'GET',
+      });
 
       const result = await response.json();
-
-      // temperature, voltage, current, capacity
-
       setBatteryData(result);
 
-      console.log('Success:', result);
+      console.log('Result: ', result);
+
+      if (result) {
+        let minStatistic = result[0][stat.toLowerCase()];
+        let maxStatistic = result[0][stat.toLowerCase()];
+
+        result.forEach((data) => {
+          if (data[stat.toLowerCase()] < minStatistic) {
+            minStatistic = data[stat.toLowerCase()];
+          }
+          if (data[stat.toLowerCase()] > maxStatistic) {
+            maxStatistic = data[stat.toLowerCase()];
+          }
+        });
+
+        setMinStat(minStatistic);
+        setMaxStat(maxStatistic);
+
+        let yAxisLabel;
+        if (stat.toLowerCase() === 'temperature') {
+          yAxisLabel = 'Temperature (°C)';
+        } else if (stat.toLowerCase() === 'capacity') {
+          yAxisLabel = 'Capacity (%)';
+        } else if (stat.toLowerCase() === 'voltage') {
+          yAxisLabel = 'Voltage (mV)';
+        } else {
+          yAxisLabel = 'Current (mA)';
+        }
+
+        setYLabel(yAxisLabel);
+      }
     } catch (error) {
       console.error('Error:', error);
     }
   }
 
+  function getPlot() {
+    let url = `http://127.0.0.1:5001/plot/${hostname}/${device}/${stat}`;
+
+    if (dischargeCycleToggle) {
+      url = `http://127.0.0.1:5001/plot/${hostname}/${device}/${stat}/${dischargeCycle}`;
+    }
+
+    fetch(url)
+      .then((response) => response.blob())
+      .then((blob) => {
+        const imageURL = URL.createObjectURL(blob);
+        setPlotImage(imageURL);
+      })
+      .catch((error) => {
+        console.error('Error fetching plot:', error);
+      });
+
+    return () => {
+      if (plotImage) {
+        URL.revokeObjectURL(plotImage);
+      }
+    };
+  }
+
   useEffect(() => {
     getData();
+    // getPlot();
   }, [hostname, device, stat]);
+
+  // useEffect(() => {
+  //   getData();
+  // }, [hostname, device, stat]);
 
   // console.log(
   //   'Total unique hostname',
@@ -75,13 +140,46 @@ export default function BatteryLanding() {
   const devices = [
     { value: 'SPO2', label: 'SPO2 Sensor' },
     { value: 'RESP', label: 'RESP Sensor' },
-    { value: 'HUB', label: 'Hub' }
+    { value: 'HUB', label: 'Hub' },
   ];
   const stats = [
     { value: 'Temperature', label: 'Temperature' },
     { value: 'Capacity', label: 'Capacity' },
     { value: 'Voltage', label: 'Voltage' },
     { value: 'Current', label: 'Current' },
+  ];
+
+  // eslint-disable-next-line react/prop-types, no-unused-vars
+  const CustomTooltip = ({ active, payload, label }) => {
+    // eslint-disable-next-line react/prop-types
+    if (active && payload && payload.length) {
+      // eslint-disable-next-line react/prop-types
+      const date = new Date(payload[0].value);
+      const dayOfWeek = [
+        'Sunday',
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+      ][date.getDay()];
+      return (
+        <div className='custom-tooltip'>
+          <p className='label'>{`Date: ${date.toLocaleDateString()}`}</p>
+          <p className='label'>{`${yLabel}: ${payload[1].value}`}</p>
+          <p className='label'>{`Day of the Week: ${dayOfWeek}`}</p>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  const dummyData = [
+    { x: '1', y: '1' },
+    { x: '2', y: '2' },
+    { x: '3', y: '3' },
   ];
 
   return (
@@ -123,7 +221,7 @@ export default function BatteryLanding() {
             justifyContent: 'center',
           }}
         >
-          <div style={{ padding: 20 }}>
+          <div>
             <div style={{ padding: 20, alignContent: 'center', width: 300 }}>
               {' '}
               <h3 style={{ color: 'black', fontSize: 24 }}>Hostname</h3>{' '}
@@ -175,29 +273,105 @@ export default function BatteryLanding() {
                 }}
               ></Select>
             </div>
+
+            <div
+              style={{
+                padding: 20,
+
+                width: 400,
+              }}
+            >
+              {/* Toggle between scatter and line */}
+            </div>
+
             <div style={{ padding: 20, alignContent: 'center', width: 400 }}>
               <Form>
-                <Form.Check onChange={() => setDischargeCycleToggle(!dischargeCycleToggle)} type="switch" label="Show Discharge Cycles"/>
+                <Form.Check
+                  onChange={() =>
+                    setDischargeCycleToggle(!dischargeCycleToggle)
+                  }
+                  type='switch'
+                  label='Show Discharge Cycles'
+                />
               </Form>
             </div>
-            {dischargeCycleToggle ? 
-              <div style={{ padding: 20, alignContent: 'center', width: 175}}>
+
+            {dischargeCycleToggle ? (
+              <div style={{ padding: 20, alignContent: 'center', width: 175 }}>
                 <Form>
                   <Form.Group>
                     <Form.Label>Discharge Cycle</Form.Label>
-                    <Form.Control defaultValue={1} onChange={e => setDischargeCycle(e.target.value)}></Form.Control>
+                    <Form.Control
+                      defaultValue={1}
+                      onChange={(e) => setDischargeCycle(e.target.value)}
+                    ></Form.Control>
                   </Form.Group>
-                  <div style={{marginTop: 10}}>
+                  <div style={{ marginTop: 10 }}>
                     <Button onClick={() => getData()}>Submit</Button>
                   </div>
                 </Form>
-              </div> :
-              <>
-              </>}
+              </div>
+            ) : (
+              <></>
+            )}
           </div>
-          <div style={{ padding: 30, paddingTop: 100, marginLeft: 100 }}>
-                
-            {/* {' '}
+
+          {batteryData && batteryData.length > 0 ? (
+            <ResponsiveContainer
+              width='100%'
+              height='100%'
+              style={{ marginTop: '20px' }}
+            >
+              <ScatterChart>
+                <CartesianGrid stroke='grey' strokeDasharray='5 5' />
+                <XAxis
+                  dataKey='timestamp'
+                  angle={-27}
+                  tickFormatter={(value) =>
+                    new Date(value).toLocaleDateString()
+                  }
+                  tickSize={20}
+                  height={130}
+                  minTickGap={40}
+                  allowDuplicateCategory={false}
+                  label={{
+                    value: 'Timestamp',
+                  }}
+                />
+                <YAxis
+                  dataKey={stat.toLowerCase()}
+                  name={stat}
+                  domain={[minStat - 2, maxStat + 2]}
+                  label={{ value: yLabel, angle: -90, position: 'insideLeft' }}
+                />
+                <Tooltip
+                  cursor={{ strokeDasharray: '3 3' }}
+                  content={<CustomTooltip />}
+                />
+                <Scatter
+                  data={batteryData}
+                  fill='#8884d8'
+                  isAnimationActive={false}
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
+          ) : (
+            <ResponsiveContainer
+              width='100%'
+              height='90%'
+              style={{ marginTop: '20px' }}
+            >
+              <ScatterChart>
+                <CartesianGrid stroke='grey' strokeDasharray='5 5' />
+                <Scatter data={dummyData} fill='#8884d8' shape={() => null} />
+                <XAxis dataKey='x' />
+                <YAxis dataKey='y' />
+              </ScatterChart>
+            </ResponsiveContainer>
+          )}
+
+          {/* <div style={{ padding: 30, marginLeft: 50 }}> */}
+          {/* {' '}
             <img
               src={
                 'Hostnames\\' +
@@ -213,8 +387,13 @@ export default function BatteryLanding() {
               alt='Battery Data'
             ></img> */}
 
-            {batteryData && batteryData.length > 0 && (
-              <LineChart data={batteryData} width={1000} height={400} margin={{top: 5, right: 40, bottom: 20, left: 20}}>
+          {/* {batteryData && batteryData.length > 0 && (
+              <LineChart
+                data={batteryData}
+                width={1000}
+                height={400}
+                margin={{ top: 5, right: 40, bottom: 20, left: 20 }}
+              >
                 <XAxis
                   dataKey='timestamp'
                   angle={-25}
@@ -226,15 +405,17 @@ export default function BatteryLanding() {
                 <YAxis dataKey={stat.toLowerCase()} type='number' />
                 <CartesianGrid stroke='grey' strokeDasharray='5 5' />
                 <Line dataKey={stat.toLowerCase()} stroke='black' dot={false} />
-                {/* <Scatter data={stat.toLowerCase()} fill="green" /> */}
+
                 <Tooltip
                   tickFormatter={(value) =>
                     new Date(value).toLocaleDateString()
                   }
                 />
               </LineChart>
-            )}
-          </div>
+            )} */}
+
+          {/* {plotImage && <img src={plotImage} alt='Plot' />} */}
+          {/* </div> */}
         </div>
       </div>
     </>
