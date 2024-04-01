@@ -4,4 +4,6 @@
 
 # To run
 
+## Unzip the BatteryTableAllLogs.zip
+
 ## python3 main.py
