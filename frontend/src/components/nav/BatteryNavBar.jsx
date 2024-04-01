@@ -55,6 +55,7 @@ export default function BatteryNavBar() {
                       results={results}
                       clearResult={clearResult}
                       setClearResult={setClearResult}
+                      clearSearchResults={clearSearchResults}
                     />
                   )}
                 </ul>
