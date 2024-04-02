@@ -1,9 +1,11 @@
-# To install dependencies do:
+## To run this code
 
-## pip3 install -r requirements.txt
+### First extract the csv file from BatteryTableAllLogs.csv then install the depenndencies
 
-# To run
+## To install dependencies do:
 
-## Unzip the BatteryTableAllLogs.zip
+### pip3 install -r requirements.txt
 
-## python3 main.py
+## To run
+
+### python3 main.py
