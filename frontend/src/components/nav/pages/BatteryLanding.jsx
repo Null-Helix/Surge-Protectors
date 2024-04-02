@@ -25,6 +25,7 @@ export default function BatteryLanding() {
   const [batteryData, setBatteryData] = useState([]);
   const [plotImage, setPlotImage] = useState(null);
   const [yLabel, setYLabel] = useState(null);
+  const [plot, setPlot] = "scatter";
 
   async function getData() {
     try {
@@ -281,9 +282,27 @@ export default function BatteryLanding() {
                 width: 400,
               }}
             >
-              {/* Toggle between scatter and line */}
             </div>
-
+            <div style={{ padding: 20, alignContent: 'center', width: 400 }}>
+              <Form>
+                <Form.Check
+                  onChange={() =>
+                    setPlot("scatter")
+                  }
+                  type='radio'
+                  label='Scatter Plot'
+                  name="1"
+                />
+                <Form.Check
+                  onChange={() =>
+                    setPlot("plot")
+                  }
+                  type='radio'
+                  label='Line Plot'
+                  name="1"
+                />
+              </Form>
+            </div>
             <div style={{ padding: 20, alignContent: 'center', width: 400 }}>
               <Form>
                 <Form.Check
