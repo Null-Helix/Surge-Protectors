@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
   Line,
   Scatter,
+  Label,
   Tooltip,
   Legend,
 } from 'recharts';
@@ -25,7 +26,7 @@ export default function BatteryLanding() {
   const [batteryData, setBatteryData] = useState([]);
   const [plotImage, setPlotImage] = useState(null);
   const [yLabel, setYLabel] = useState(null);
-  const [plot, setPlot] = "scatter";
+  const [plot, setPlot] = useState('plot');
 
   async function getData() {
     try {
@@ -45,8 +46,6 @@ export default function BatteryLanding() {
 
       const result = await response.json();
       setBatteryData(result);
-
-      console.log('Result: ', result);
 
       if (result) {
         let minStatistic = result[0][stat.toLowerCase()];
@@ -81,6 +80,8 @@ export default function BatteryLanding() {
       console.error('Error:', error);
     }
   }
+
+  useEffect(() => {}, [plot]);
 
   function getPlot() {
     let url = `http://127.0.0.1:5001/plot/${hostname}/${device}/${stat}`;
@@ -169,6 +170,40 @@ export default function BatteryLanding() {
         <div className='custom-tooltip'>
           <p className='label'>{`Date: ${date.toLocaleDateString()}`}</p>
           <p className='label'>{`${yLabel}: ${payload[1].value}`}</p>
+          <p className='label'>{`Day of the Week: ${dayOfWeek}`}</p>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  const capitalizeFirstLetter = (string) => {
+    return string.charAt(0).toUpperCase() + string.slice(1);
+  };
+
+  const LineGraphToolTip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const date = new Date(payload[0].payload.timestamp);
+      const dayOfWeek = [
+        'Sunday',
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+      ][date.getDay()];
+
+      const dataKey = capitalizeFirstLetter(payload[0].dataKey);
+      console.log(payload[0].payload);
+      const keys = Object.keys(payload[0].payload);
+      return (
+        <div className='custom-tooltip'>
+          <p className='label'>{`Date: ${date.toLocaleDateString()}`}</p>
+          <p className='label'>{`${dataKey}: ${
+            payload[0].payload[keys[1]]
+          }`}</p>
           <p className='label'>{`Day of the Week: ${dayOfWeek}`}</p>
         </div>
       );
@@ -277,29 +312,24 @@ export default function BatteryLanding() {
 
             <div
               style={{
-                padding: 20,
-
                 width: 400,
               }}
-            >
-            </div>
+            ></div>
             <div style={{ padding: 20, alignContent: 'center', width: 400 }}>
               <Form>
                 <Form.Check
-                  onChange={() =>
-                    setPlot("scatter")
-                  }
-                  type='radio'
-                  label='Scatter Plot'
-                  name="1"
-                />
-                <Form.Check
-                  onChange={() =>
-                    setPlot("plot")
-                  }
+                  onChange={() => setPlot('plot')}
                   type='radio'
                   label='Line Plot'
-                  name="1"
+                  name='1'
+                  checked={plot === 'plot'}
+                />
+                <Form.Check
+                  onChange={() => setPlot('scatter')}
+                  type='radio'
+                  label='Scatter Plot'
+                  name='1'
+                  checked={plot === 'scatter'}
                 />
               </Form>
             </div>
@@ -334,104 +364,109 @@ export default function BatteryLanding() {
               <></>
             )}
           </div>
-
-          {batteryData && batteryData.length > 0 ? (
-            <ResponsiveContainer
-              width='100%'
-              height='100%'
-              style={{ marginTop: '20px' }}
-            >
-              <ScatterChart>
-                <CartesianGrid stroke='grey' strokeDasharray='5 5' />
-                <XAxis
-                  dataKey='timestamp'
-                  angle={-27}
-                  tickFormatter={(value) =>
-                    new Date(value).toLocaleDateString()
-                  }
-                  tickSize={20}
-                  height={130}
-                  minTickGap={40}
-                  allowDuplicateCategory={false}
-                  label={{
-                    value: 'Timestamp',
-                  }}
-                />
-                <YAxis
-                  dataKey={stat.toLowerCase()}
-                  name={stat}
-                  domain={[minStat - 2, maxStat + 2]}
-                  label={{ value: yLabel, angle: -90, position: 'insideLeft' }}
-                />
-                <Tooltip
-                  cursor={{ strokeDasharray: '3 3' }}
-                  content={<CustomTooltip />}
-                />
-                <Scatter
-                  data={batteryData}
-                  fill='#8884d8'
-                  isAnimationActive={false}
-                />
-              </ScatterChart>
-            </ResponsiveContainer>
-          ) : (
-            <ResponsiveContainer
-              width='100%'
-              height='90%'
-              style={{ marginTop: '20px' }}
-            >
-              <ScatterChart>
-                <CartesianGrid stroke='grey' strokeDasharray='5 5' />
-                <Scatter data={dummyData} fill='#8884d8' shape={() => null} />
-                <XAxis dataKey='x' />
-                <YAxis dataKey='y' />
-              </ScatterChart>
-            </ResponsiveContainer>
-          )}
-
-          {/* <div style={{ padding: 30, marginLeft: 50 }}> */}
-          {/* {' '}
-            <img
-              src={
-                'Hostnames\\' +
-                hostname +
-                '\\' +
-                hostname +
-                '_' +
-                device +
-                '_' +
-                stat +
-                '.png'
-              }
-              alt='Battery Data'
-            ></img> */}
-
-          {/* {batteryData && batteryData.length > 0 && (
-              <LineChart
-                data={batteryData}
-                width={1000}
-                height={400}
-                margin={{ top: 5, right: 40, bottom: 20, left: 20 }}
+          {plot === 'scatter' ? (
+            batteryData && batteryData.length > 0 ? (
+              <ResponsiveContainer
+                width='100%'
+                height='100%'
+                style={{ marginTop: '20px' }}
               >
-                <XAxis
-                  dataKey='timestamp'
-                  angle={-25}
-                  tickFormatter={(value) =>
-                    new Date(value).toLocaleDateString()
-                  }
-                  tickSize={20}
+                <ScatterChart style={{ overflow: 'visible' }}>
+                  <CartesianGrid stroke='grey' strokeDasharray='5 5' />
+                  <XAxis
+                    dataKey='timestamp'
+                    angle={-15}
+                    tickFormatter={(value) =>
+                      new Date(value).toLocaleDateString()
+                    }
+                    tickSize={20}
+                    height={130}
+                    minTickGap={40}
+                    allowDuplicateCategory={false}
+                    label={{
+                      value: 'Timestamp',
+                    }}
+                  />
+                  <YAxis
+                    dataKey={stat.toLowerCase()}
+                    name={stat}
+                    domain={[minStat - 2, maxStat + 2]}
+                    label={{
+                      value: yLabel,
+                      angle: -90,
+                      position: 'insideLeft',
+                    }}
+                  />
+                  <Tooltip
+                    cursor={{ strokeDasharray: '3 3' }}
+                    content={<CustomTooltip />}
+                  />
+                  <Scatter
+                    data={batteryData}
+                    fill='#8884d8'
+                    isAnimationActive={false}
+                  />
+                </ScatterChart>
+              </ResponsiveContainer>
+            ) : (
+              <ResponsiveContainer
+                width='100%'
+                height='90%'
+                style={{ marginTop: '20px' }}
+              >
+                <ScatterChart>
+                  <CartesianGrid stroke='grey' strokeDasharray='5 5' />
+                  <Scatter data={dummyData} fill='#8884d8' shape={() => null} />
+                  <XAxis dataKey='x' />
+                  <YAxis dataKey='y' />
+                </ScatterChart>
+              </ResponsiveContainer>
+            )
+          ) : batteryData && batteryData.length > 0 ? (
+            <LineChart
+              data={batteryData}
+              width={1000}
+              height={600}
+              margin={{ top: 5, right: 40, bottom: 20, left: 20 }}
+            >
+              <XAxis
+                dataKey='timestamp'
+                angle={-25}
+                tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                tickSize={20}
+              >
+                {' '}
+                <Label
+                  value='Timestamp'
+                  position='bottom'
+                  offset={45}
+                  allowDuplicateCategory={false}
                 />
-                <YAxis dataKey={stat.toLowerCase()} type='number' />
-                <CartesianGrid stroke='grey' strokeDasharray='5 5' />
-                <Line dataKey={stat.toLowerCase()} stroke='black' dot={false} />
+              </XAxis>
+              <YAxis
+                dataKey={stat.toLowerCase()}
+                type='number'
+                domain={[minStat - 2, maxStat + 2]}
+                label={{ value: yLabel, angle: -90, position: 'insideLeft' }}
+              />
+              <CartesianGrid stroke='grey' strokeDasharray='5 5' />
+              <Line dataKey={stat.toLowerCase()} stroke='black' dot={false} />
 
-                <Tooltip
-                  tickFormatter={(value) =>
-                    new Date(value).toLocaleDateString()
-                  }
-                />
-              </LineChart>
-            )} */}
+              <Tooltip content={<LineGraphToolTip />} />
+            </LineChart>
+          ) : (
+            <LineChart
+              data={dummyData}
+              width={1000}
+              height={600}
+              margin={{ top: 5, right: 40, bottom: 20, left: 20 }}
+            >
+              <XAxis dataKey='x' />
+              <YAxis dataKey='y' />
+              <CartesianGrid stroke='grey' strokeDasharray='5 5' />
+              <Line stroke='black' dot={false} />
+            </LineChart>
+          )}
 
           {/* {plotImage && <img src={plotImage} alt='Plot' />} */}
           {/* </div> */}
