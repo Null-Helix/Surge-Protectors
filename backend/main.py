@@ -121,6 +121,17 @@ class HostName(Resource):
         json_data = json.dumps(hostnames, indent=1)
         cache.set('all_hostnames', json_data)
         return Response(json_data, mimetype='application/json')
+    
+class FileInfo(Resource):
+    def get(self):
+        num_rows = len(hub_df)
+        file_size_mb = hub_df.memory_usage(deep=True).sum() / (1024 * 1024) 
+        data = {
+            "num_rows": num_rows,
+            "file_size_mb": file_size_mb
+        }
+        json_data = json.dumps(data)
+        return Response(json_data, mimetype='application/json')
 
 class Stat(Resource):
     def get(self, hostname):
@@ -182,6 +193,7 @@ class Stat(Resource):
 api.add_resource(Plot, "/plot/<string:hostname>/<string:device>/<string:stat>", "/plot/<string:hostname>/<string:device>/<string:stat>/<string:dischargeCycle>")
 api.add_resource(HubInfo, "/hubinfo/<string:hostname>/<string:device>/<string:stat>", "/hubinfo/<string:hostname>/<string:device>/<string:stat>/<string:dischargeCycle>")
 api.add_resource(HostName, "/hostnames")
+api.add_resource(FileInfo, "/fileinfo")
 api.add_resource(Stat, "/stat/<string:hostname>")
 
 if __name__ == '__main__':
