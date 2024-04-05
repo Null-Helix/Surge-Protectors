@@ -20,8 +20,9 @@ def isLog(f):
 """
 Parses a single csv file, adding entries to .dat files as it progresses.
 """
-def parseLog(log_file, table):
+def parseLog(log_file, table, all_logs, battery_logs):
     log = pd.read_csv(log_file)
+    all_logs[0] += log.shape[0]
     log = log[log['eventCategory'] == 'PerfData'].reset_index()
     for i in range(log.shape[0]):
         PerfData = loads(log['description'][i])['PerfData']
@@ -59,17 +60,24 @@ def main(argv):
         print('Usage: python log_parser.py <path to log files>', file=sys.stderr)
         sys.exit(1)
     table = {}
+    all_logs = {}
+    all_logs[0] = 0
+    battery_logs = {}
+    battery_logs[0] = 0
     for f in argv[1:]:
         if isLog(f):
-            parseLog(f, table)
+            parseLog(f, table, all_logs, battery_logs)
             print("Success parsing " + f)
     batteryTable = open('batteryTable.csv', 'w')
     batteryTable.write(','.join(['hostName', 'device', 'timestamp', 'temperature', 'voltage', 'current', 'capacity']) + '\n')
     for line in table.values():
         new_line = ','.join([line['hostName'], line['device'], line['timestamp'], str(line['temp']), str(line['voltage']), str(line['current']), str(line['capacity'])]) + '\n'
         if 'None' not in new_line:
+            battery_logs[0] += 1
             batteryTable.write(new_line)
     batteryTable.close()
+    print("Number of rows in logs: " + str(all_logs[0]))
+    print("Number of unique battery logs: " + str(battery_logs[0]))
 
 if __name__ == '__main__':
     main(sys.argv)
