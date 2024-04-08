@@ -1,0 +1,4 @@
+Rows in logs: 13568726
+Unique battery logs: 8343277
+Before parsing: 13.1 GB
+After parsing: 0.5 GB

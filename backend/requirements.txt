@@ -13,3 +13,4 @@ Werkzeug==0.16.0
 pandas
 flask-cors
 numpy
+matplotlib
