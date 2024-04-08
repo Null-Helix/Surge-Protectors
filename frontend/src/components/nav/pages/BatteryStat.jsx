@@ -13,7 +13,6 @@ export default function BatteryStat() {
       .then((response) => response.json())
       .then((data) => {
         setData(data);
-        console.log('Updated');
       })
       .catch((error) => {
         console.error('Error fetching plot:', error);

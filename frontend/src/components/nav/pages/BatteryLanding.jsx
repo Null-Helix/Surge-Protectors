@@ -32,8 +32,6 @@ export default function BatteryLanding() {
   // This function will get json data about hub, resp, spo2 sensor
   async function getData() {
     try {
-      console.log('Data', hostname, device, stat, dischargeCycle);
-
       let url = `http://127.0.0.1:5001/hubinfo/${hostname}/${device}/${stat}`;
 
       if (dischargeCycleToggle) {
@@ -46,7 +44,7 @@ export default function BatteryLanding() {
 
       const result = await response.json();
       setBatteryData(result);
-      console.log(batteryData);
+      console.log('batteryData: ', batteryData);
 
       if (result && result.length > 0) {
         let minStatistic = result[0][stat.toLowerCase()];
