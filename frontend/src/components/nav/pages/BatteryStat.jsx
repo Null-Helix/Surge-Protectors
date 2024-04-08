@@ -1,11 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import Plot from 'react-plotly.js';
-import Table from 'react-bootstrap/Table';
+import HostNameContext from '../../contexts/HostNameContext';
 
 export default function BatteryStat() {
-  const currentUrl = window.location.href;
-  const parts = currentUrl.split('/');
-  const [hostName, setHostName] = useState(parts[parts.length - 1]);
+  const [hostName, setHostName] = useContext(HostNameContext);
   const [data, setData] = useState([]);
 
   useEffect(() => {
@@ -15,7 +13,7 @@ export default function BatteryStat() {
       .then((response) => response.json())
       .then((data) => {
         setData(data);
-        console.log('Data', data);
+        console.log('Updated');
       })
       .catch((error) => {
         console.error('Error fetching plot:', error);
@@ -137,7 +135,7 @@ export default function BatteryStat() {
               <tr>
                 <td>
                   <img
-                    src='/public/hub.png'
+                    src='/hub.png'
                     alt='Hub Image'
                     style={{
                       width: '50px',
@@ -157,7 +155,7 @@ export default function BatteryStat() {
               <tr>
                 <td>
                   <img
-                    src='/public/resp.png'
+                    src='/resp.png'
                     alt='Hub Image'
                     style={{
                       width: '50px',
@@ -177,7 +175,7 @@ export default function BatteryStat() {
               <tr>
                 <td>
                   <img
-                    src='/public/sp.png'
+                    src='/sp.png'
                     alt='Hub Image'
                     style={{
                       width: '50px',

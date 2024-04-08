@@ -13,8 +13,6 @@ import {
 } from 'recharts';
 import LinePlot from './LinePlot';
 import ScatterPlot from './ScatterPlot';
-import Slider from 'rc-slider';
-import 'rc-slider/assets/index.css';
 
 export default function BatteryLanding() {
   const [hostname, setHostname] = useState('44-4b-5d-01-04-19');
