@@ -75,11 +75,6 @@ class Plot(Resource):
 class HubInfo(Resource):
     def get(self, hostname, device, stat, dischargeCycle = None):
 
-        print("hostname",hostname)
-        print("device",device)
-        print("stat",stat)
-        print("dischargeCycle", dischargeCycle)
-
         cached_data = cache.get((hostname, device, stat))
         if cached_data:
             return Response(cached_data, mimetype='application/json')
@@ -98,12 +93,24 @@ class HubInfo(Resource):
 
         stat = stat.lower()
 
-        desired_attributes = ["timestamp", stat]
+        desired_attributes = ["timestamp", "cycle", stat]
         filtered_data = filtered_data[desired_attributes]
 
         max_points_to_display = 10000
         if len(filtered_data) > max_points_to_display:
             filtered_data = filtered_data.sample(n=max_points_to_display)
+
+        # cycle_data = {}
+
+        # for index, row in filtered_data.iterrows():
+        #     cycle = row['cycle']
+            
+        #     if cycle not in cycle_data:
+        #         cycle_data[cycle] = []
+            
+        #     cycle_data[cycle].append(row.to_dict())
+        
+        # json_data = json.dumps(cycle_data, indent=1)
 
         json_data = filtered_data.to_json(indent = 1, orient='records')
 
@@ -120,6 +127,29 @@ class HostName(Resource):
         hostnames = hub_df['hostName'].unique().tolist()
         json_data = json.dumps(hostnames, indent=1)
         cache.set('all_hostnames', json_data)
+        return Response(json_data, mimetype='application/json')
+    
+class LogDataInfo(Resource):
+    def get(self):
+        print("LogData")
+        file_path = 'logData.txt'
+        data = {}
+
+        with open(file_path, 'r') as file:
+            lines = file.readlines()
+        
+        for line in lines:
+            if line.startswith('Rows in logs:'):
+                data['rows_in_logs'] = int(line.split(': ')[1].strip())
+            elif line.startswith('Unique battery logs:'):
+                data['unique_battery_logs'] = int(line.split(': ')[1].strip())
+            elif line.startswith('Before parsing:'):
+                data['file_memory_before_parsing'] = line.split(': ')[1].strip()
+            elif line.startswith('After parsing:'):
+                data['file_memory_after_parsing'] = line.split(': ')[1].strip()
+        
+        json_data = json.dumps(data, indent=4)
+        print(json_data)
         return Response(json_data, mimetype='application/json')
 
 class Stat(Resource):
@@ -182,6 +212,7 @@ class Stat(Resource):
 api.add_resource(Plot, "/plot/<string:hostname>/<string:device>/<string:stat>", "/plot/<string:hostname>/<string:device>/<string:stat>/<string:dischargeCycle>")
 api.add_resource(HubInfo, "/hubinfo/<string:hostname>/<string:device>/<string:stat>", "/hubinfo/<string:hostname>/<string:device>/<string:stat>/<string:dischargeCycle>")
 api.add_resource(HostName, "/hostnames")
+api.add_resource(LogDataInfo, "/loginfo")
 api.add_resource(Stat, "/stat/<string:hostname>")
 
 if __name__ == '__main__':
