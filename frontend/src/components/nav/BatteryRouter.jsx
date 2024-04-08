@@ -14,7 +14,7 @@ export default function BatteryRouter() {
           <Route index element={<BatteryLanding />} />
 
           <Route path='battery-info' element={<BatteryInfo />} />
-          <Route path='battery-stat/*' element={<BatteryStat />} />
+          <Route path='battery-stat/*' element={<BatteryStat />}></Route>
 
           {/* Error page when route doesn't match */}
           <Route path='*' element={<BatteryError />} />
