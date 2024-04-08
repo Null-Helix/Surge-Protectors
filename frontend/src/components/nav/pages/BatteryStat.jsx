@@ -84,6 +84,7 @@ export default function BatteryStat() {
           paddingTop: '40px',
           paddingBottom: '30px',
           display: 'flex',
+          flexDirection: 'column',
         }}
       >
         <h5 style={{ display: 'flex' }}>
@@ -92,8 +93,110 @@ export default function BatteryStat() {
             alt='Hub Photo'
             style={{ width: '200px', height: '200px', marginRight: '30px' }}
           />
-          Hub Name: <p style={{ marginLeft: '10px' }}>{hostName}</p>
+          <div>
+            <div style={{ flexDirection: 'column' }}>
+              <p style={{ margin: '10px' }}>
+                <strong>Hub Name:</strong> {hostName}
+              </p>
+            </div>
+            <div>
+              <p style={{ margin: '10px', paddingTop: '12px' }}>
+                <strong>Device Anomaly:</strong> 1
+              </p>
+            </div>
+          </div>
         </h5>
+
+        <section
+          className='table__body'
+          style={{
+            alignItems: 'center',
+            marginTop: '20px',
+            marginBottom: '15px',
+          }}
+        >
+          <table>
+            <thead>
+              <tr>
+                <th> Devices </th>
+                <th> Average Temperature </th>
+                <th> Average Voltage </th>
+                <th> Cycle Count </th>
+                <th
+                  style={{
+                    paddingRight: '20px',
+                    textAlign: 'center',
+                  }}
+                >
+                  {' '}
+                  Condition{' '}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <img
+                    src='/public/hub.png'
+                    alt='Hub Image'
+                    style={{
+                      width: '50px',
+                      marginRight: '10px',
+                      height: '40px',
+                    }}
+                  />
+                  Hub
+                </td>
+                <td> </td>
+                <td> </td>
+                <td> </td>
+                <td>
+                  <p className='status success'>Safe</p>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <img
+                    src='/public/resp.png'
+                    alt='Hub Image'
+                    style={{
+                      width: '50px',
+                      marginRight: '10px',
+                      height: '40px',
+                    }}
+                  />
+                  Respiratory Sensor
+                </td>
+                <td> </td>
+                <td> </td>
+                <td> </td>
+                <td>
+                  <p className='status danger'>Danger</p>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <img
+                    src='/public/sp.png'
+                    alt='Hub Image'
+                    style={{
+                      width: '50px',
+                      marginRight: '10px',
+                      height: '40px',
+                    }}
+                  />
+                  SPO2 Sensor
+                </td>
+                <td> </td>
+                <td> </td>
+                <td> </td>
+                <td>
+                  <p className='status success'>Safe</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
       </div>
 
       {/* <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -124,62 +227,6 @@ export default function BatteryStat() {
         </Table>
       </div>
       */}
-
-      <section className='table__body'>
-        <table>
-          <thead>
-            <tr>
-              <th> Id </th>
-              <th> Customer </th>
-              <th> Location </th>
-              <th> Order Date </th>
-              <th> Status </th>
-              <th> Amount </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td> 1 </td>
-              <td> Zinzu Chan Lee</td>
-              <td> Seoul </td>
-              <td> 17 Dec, 2022 </td>
-              <td>
-                <p className='status success'>Delivered</p>
-              </td>
-              <td>
-                {' '}
-                <strong> $128.90 </strong>
-              </td>
-            </tr>
-            <tr>
-              <td> 2 </td>
-              <td>Jeet Saru </td>
-              <td> Kathmandu </td>
-              <td> 27 Aug, 2023 </td>
-              <td>
-                <p className='status danger'>Cancelled</p>
-              </td>
-              <td>
-                {' '}
-                <strong>$5350.50</strong>{' '}
-              </td>
-            </tr>
-            <tr>
-              <td> 3</td>
-              <td> Sonal Gharti </td>
-              <td> Tokyo </td>
-              <td> 14 Mar, 2023 </td>
-              <td>
-                <p className='status normal'>Shipped</p>
-              </td>
-              <td>
-                {' '}
-                <strong>$210.40</strong>{' '}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
 
       <div
         style={{

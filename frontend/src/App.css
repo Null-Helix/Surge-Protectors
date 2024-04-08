@@ -164,7 +164,7 @@ input:focus {
 }
 
 table__body {
-  width: 95%;
+  width: 85%;
   max-height: calc(89% - 1.6rem);
   background-color: #fffb;
 
@@ -191,7 +191,7 @@ table__body {
 }
 
 table {
-  width: 100%;
+  width: 85%;
 }
 
 td img {
@@ -208,6 +208,7 @@ th,
 td {
   border-collapse: collapse;
   padding: 1rem;
+  padding-right: 0%;
   text-align: left;
 }
 
@@ -220,10 +221,6 @@ thead th {
   text-transform: capitalize;
 }
 
-tbody tr:nth-child(even) {
-  background-color: #0000000b;
-}
-
 tbody tr:hover {
   background-color: #fff6 !important;
 }
@@ -234,7 +231,7 @@ tbody tr:hover {
   text-align: center;
 }
 
-.status.safe {
+.status.success {
   background-color: #86e49d;
   color: #006b21;
 }
