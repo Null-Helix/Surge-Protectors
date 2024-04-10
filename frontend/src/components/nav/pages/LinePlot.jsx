@@ -12,8 +12,6 @@ import {
 } from 'recharts';
 
 const LinePlot = ({ batteryData, minStat, stat, maxStat, yLabel }) => {
-  console.log('Inside line plot', batteryData);
-
   const capitalizeFirstLetter = (string) => {
     return string.charAt(0).toUpperCase() + string.slice(1);
   };

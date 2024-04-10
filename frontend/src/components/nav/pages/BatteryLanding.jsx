@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Button, Form } from 'react-bootstrap';
+import { useState, useEffect,  } from 'react';
+import { Button, Form, Card, Container, Row, Col } from 'react-bootstrap';
 import Select from 'react-select';
 import {
   LineChart,
@@ -13,8 +13,6 @@ import {
 } from 'recharts';
 import LinePlot from './LinePlot';
 import ScatterPlot from './ScatterPlot';
-import Slider from 'rc-slider';
-import 'rc-slider/assets/index.css';
 
 export default function BatteryLanding() {
   const [hostname, setHostname] = useState('44-4b-5d-01-04-19');
@@ -34,8 +32,6 @@ export default function BatteryLanding() {
   // This function will get json data about hub, resp, spo2 sensor
   async function getData() {
     try {
-      console.log('Data', hostname, device, stat, dischargeCycle);
-
       let url = `http://127.0.0.1:5001/hubinfo/${hostname}/${device}/${stat}`;
 
       if (dischargeCycleToggle) {
@@ -48,7 +44,7 @@ export default function BatteryLanding() {
 
       const result = await response.json();
       setBatteryData(result);
-      console.log(batteryData);
+      console.log('batteryData: ', batteryData);
 
       if (result && result.length > 0) {
         let minStatistic = result[0][stat.toLowerCase()];
@@ -101,6 +97,7 @@ export default function BatteryLanding() {
 
         const data = await response.json();
         setLogData(data);
+        console.log("print logData: ", logData);
       } catch (error) {
         console.error('Fetch error:', error);
         // Handle fetch errors (e.g., set state, display error message)
@@ -384,6 +381,23 @@ export default function BatteryLanding() {
           {/* {plotImage && <img src={plotImage} alt='Plot' />} */}
           {/* </div> */}
         </div>
+        <Container fluid>
+          <Row>
+          {
+            //Use Object.keys to map the fields in the logData object
+            Object.keys(logData).map(key => {
+              //console.log(key, "hello");
+              //return a Card object showing the title and statistic
+              return <Col key={key} sm={6} md={6} lg={3} xl={3}>
+                <Card style={{backgroundColor:"#650acd"}} title={key}>
+                  <h1 style={{color:"white", fontSize:20}}>{key.replace(/_/g, " ")}:</h1>
+                  <h2 style={{backgroundColor:"white"}}>{logData[key]}</h2>
+                </Card>
+              </Col>
+            })
+          }
+          </Row>
+        </Container>
       </div>
     </>
   );
