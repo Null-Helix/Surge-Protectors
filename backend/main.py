@@ -141,13 +141,13 @@ class LogDataInfo(Resource):
         
         for line in lines:
             if line.startswith('Rows in logs:'):
-                data['rows_in_logs'] = int(line.split(': ')[1].strip())
+                data['Rows_in_log_files'] = int(line.split(': ')[1].strip())
             elif line.startswith('Unique battery logs:'):
-                data['unique_battery_logs'] = int(line.split(': ')[1].strip())
+                data['Unique_battery_logs'] = int(line.split(': ')[1].strip())
             elif line.startswith('Before parsing:'):
-                data['file_memory_before_parsing'] = line.split(': ')[1].strip()
+                data['Data_size_before_parsing'] = line.split(': ')[1].strip()
             elif line.startswith('After parsing:'):
-                data['file_memory_after_parsing'] = line.split(': ')[1].strip()
+                data['Data_size_after_parsing'] = line.split(': ')[1].strip()
         
         json_data = json.dumps(data, indent=4)
         print(json_data)

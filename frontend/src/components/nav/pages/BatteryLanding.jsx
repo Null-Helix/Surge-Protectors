@@ -181,6 +181,29 @@ export default function BatteryLanding() {
 
   return (
     <>
+      <Container madWidth="sm">
+          <Row>
+            {
+              //Use Object.keys to map the fields in the logData object
+              Object.keys(logData).map((key) => {
+                //console.log(key, "hello");
+                //return a Card object showing the title and statistic
+                return (
+                  <Col key={key} sm={6} md={6} lg={3} xl={3}>
+                    <Card style={{ backgroundColor: '#650acd' }} title={key}>
+                      <h1 style={{ color: 'white', fontSize: 20, textAlign: 'center' }}>
+                        {key.replace(/_/g, ' ')}:
+                      </h1>
+                      <h2 style={{ backgroundColor: 'white', textAlign: 'center'}}>
+                        {logData[key]}
+                      </h2>
+                    </Card>
+                  </Col>
+                );
+              })
+            }
+          </Row>
+        </Container>
       <link
         href='https://fonts.googleapis.com/css?family=Source+Sans+Pro'
         rel='stylesheet'
@@ -380,29 +403,6 @@ export default function BatteryLanding() {
           {/* {plotImage && <img src={plotImage} alt='Plot' />} */}
           {/* </div> */}
         </div>
-        <Container fluid>
-          <Row>
-            {
-              //Use Object.keys to map the fields in the logData object
-              Object.keys(logData).map((key) => {
-                //console.log(key, "hello");
-                //return a Card object showing the title and statistic
-                return (
-                  <Col key={key} sm={6} md={6} lg={3} xl={3}>
-                    <Card style={{ backgroundColor: '#650acd' }} title={key}>
-                      <h1 style={{ color: 'white', fontSize: 20 }}>
-                        {key.replace(/_/g, ' ')}:
-                      </h1>
-                      <h2 style={{ backgroundColor: 'white' }}>
-                        {logData[key]}
-                      </h2>
-                    </Card>
-                  </Col>
-                );
-              })
-            }
-          </Row>
-        </Container>
       </div>
     </>
   );
