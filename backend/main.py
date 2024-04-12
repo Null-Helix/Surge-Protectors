@@ -10,6 +10,7 @@ from io import BytesIO
 import json
 import os
 import numpy as np
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -152,9 +153,8 @@ class LogDataInfo(Resource):
         print(json_data)
         return Response(json_data, mimetype='application/json')
 
-class Stat(Resource):
+class StatFiveNumberSummary(Resource):
     def get(self, hostname):
-        print("Stat hostname", hostname)
 
         filtered_data = hub_df[(hub_df['hostName'] == hostname)]
 
@@ -208,11 +208,64 @@ class Stat(Resource):
 
         return jsonify(summaries)
 
+class Stat(Resource):
+    def get(self, hostname):
+
+        filtered_data = hub_df[(hub_df['hostName'] == hostname)]
+
+        data = {}
+
+        ## need to find max and min voltage
+        ## max temperature 
+        ## earliest start date of the log
+        ## latest date of the log
+        max_voltage = filtered_data['voltage'].max()
+        min_voltage = filtered_data['voltage'].min()
+        max_temperature = filtered_data['temperature'].max()
+        min_date = filtered_data['timestamp'].min()
+        max_date = filtered_data['timestamp'].max()
+        min_datetime = datetime.strptime(min_date, '%Y-%m-%dT%H:%M:%S.%f')
+        max_datetime = datetime.strptime(max_date, '%Y-%m-%dT%H:%M:%S.%f')
+
+        # Format dates as required (day month year)
+        earliest_date = min_datetime.strftime('%-d %b %Y')
+        latest_date = max_datetime.strftime('%-d %b %Y')
+
+        ## group by device find average temperature, capacity and maximum cycle  
+        grouped_data = filtered_data.groupby('device').agg({
+            'temperature': ['mean', 'max', 'min'],
+            'voltage': ['max', 'min'],
+            'capacity': 'mean',
+            'cycle': 'max',
+            'timestamp': ['min', 'max']
+        })
+
+        device_stats = {}
+        for device, stats in grouped_data.iterrows():
+            device_stats[device] = {
+                'average_temperature': float(stats['temperature']['mean']),
+                'max_temperature': float(stats['temperature']['max']),
+                'min_temperature': float(stats['temperature']['min']),
+                'max_voltage': float(stats['voltage']['max']),
+                'min_voltage': float(stats['voltage']['min']),
+                'average_capacity': float(stats['capacity']),
+                'max_cycle': int(stats['cycle'])
+            }
+
+        data['max_voltage'] = float(max_voltage)
+        data['min_voltage'] = float(min_voltage)
+        data['max_temperature'] = float(max_temperature)
+        data['earliest_date'] = earliest_date
+        data['latest_date'] = latest_date
+        data['device_stats'] = device_stats
+        
+        return jsonify(data)
 
 api.add_resource(Plot, "/plot/<string:hostname>/<string:device>/<string:stat>", "/plot/<string:hostname>/<string:device>/<string:stat>/<string:dischargeCycle>")
 api.add_resource(HubInfo, "/hubinfo/<string:hostname>/<string:device>/<string:stat>", "/hubinfo/<string:hostname>/<string:device>/<string:stat>/<string:dischargeCycle>")
 api.add_resource(HostName, "/hostnames")
 api.add_resource(LogDataInfo, "/loginfo")
+api.add_resource(StatFiveNumberSummary, "/stat_five_number_summary/<string:hostname>")
 api.add_resource(Stat, "/stat/<string:hostname>")
 
 if __name__ == '__main__':
