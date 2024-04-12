@@ -1,0 +1,146 @@
+---
+title: "Analysis3"
+output: html_document
+date: "2024-04-11"
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(readr)
+```
+
+```{r, echo=FALSE}
+df = read_csv("BatteryTableAllLogs.csv") %>%
+  filter(device != "HUB")
+```
+
+```{r, echo=FALSE}
+df <- df[complete.cases(df), ]
+
+# Step 3: Group data by hostName and device
+battery_groups <- df %>%
+  group_by(hostName, device) %>%
+  arrange(timestamp) %>% # Ensure data is sorted by timestamp
+  filter(device == "SPO2SENSOR")
+
+```
+
+```{r, echo=FALSE}
+# Step 4: Detect discharging periods and battery swap events
+
+# Function to detect discharging periods and battery swap events
+detect_events <- function(capacity, threshold) {
+  # Initialize empty vectors to store event indices
+  discharging_indices <- numeric(0)
+  swap_indices <- numeric(0)
+  
+  # Loop through capacity values
+  for (i in 2:length(capacity)) {
+    # Check for discharging period
+    if (capacity[i] < capacity[i - 1]) {
+      discharging_indices <- c(discharging_indices, i)
+    }
+    # Check for battery swap event
+    if (capacity[i] - capacity[i - 1] > threshold) {
+      swap_indices <- c(swap_indices, i)
+    }
+  }
+  
+  return(list(discharging = discharging_indices, swap = swap_indices))
+}
+```
+
+```{r, echo=FALSE}
+# Step 5: Apply the function to each battery group
+threshold <- 5  # Adjust this threshold according to your dataset
+battery_results <- battery_groups %>%
+  summarize(
+    discharging_events = list(detect_events(capacity, threshold)['discharging']),
+    swap_events = list(detect_events(capacity, threshold)['swap']),
+    .groups = "drop"
+  )
+```
+
+```{r}
+spo2_results = battery_results %>%
+  filter(device == "SPO2SENSOR", hostName == "44-4b-5d-01-04-19")
+```
+
+```{r, echo=FALSE}
+# Plot discharging periods and battery swap events for each battery group
+for (i in 1:nrow(spo2_results)) {
+  # Get battery group data
+  battery_data <- battery_groups[i, ]
+  
+  # Extract discharging periods and battery swap events
+  discharging_periods <- unlist(spo2_results$discharging_events[i])
+  swap_events <- unlist(spo2_results$swap_events[i])
+  
+  # Plot capacity over time
+  ggplot(battery_data, aes(x = timestamp, y = capacity)) +
+    geom_line() +
+    geom_vline(xintercept = battery_data$timestamp[discharging_periods], color = "red", linetype = "dashed") +
+    geom_vline(xintercept = battery_data$timestamp[swap_events], color = "blue", linetype = "dashed") +
+    labs(title = paste("Battery:", battery_data$hostName, "-", battery_data$device),
+         x = "Timestamp",
+         y = "Capacity") +
+    theme_minimal()
+}
+```
+
+```{r}
+
+library(ggplot2)
+
+# Step 3: Group data by hostName and device
+spo2_groups <- df %>%
+  filter(device == "SPO2SENSOR") %>%
+  group_by(hostName) %>%
+  arrange(timestamp)
+
+# Get the first group from the grouped data
+spo2_data <- spo2_groups %>%
+  filter(hostName == "44-4b-5d-01-04-19")
+
+# Extract discharging periods and battery swap events
+discharging_periods <- unlist(spo2_results$discharging_events)
+swap_events <- unlist(spo2_results$swap_events)
+
+# Create a new column indicating whether each timestamp corresponds to a discharging period
+spo2_data <- spo2_data %>%
+  mutate(is_discharging_period = timestamp %in% spo2_data$timestamp[discharging_periods])
+
+# Plot capacity over time
+ggplot(spo2_data, aes(x = timestamp, y = capacity, color = is_discharging_period)) + # Use geom_line() to connect the points
+  geom_point() + # Add points
+  scale_color_manual(values = c("black", "red"), labels = c("No", "Yes")) + # Set color for discharging periods
+  labs(title = paste("Battery:", spo2_data$hostName, "-", spo2_data$device),
+       x = "Timestamp",
+       y = "Capacity",
+       color = "Discharging Period") +
+  theme_minimal()
+
+```
+
+## Discharge Rate Analysis
+
+clustered_df <- df %>%
+  arrange(hostName, device, timestamp) %>%
+  group_by(hostName, device) %>%
+  mutate(jump_cluster = cumsum(capacity - lag(capacity, default = first(capacity)) > 5 | 
+                                is.na(lag(capacity))))
+
+filtered2_df <- clustered_df %>%
+  filter(hostName == "44-4b-5d-01-04-51", device == "SPO2SENSOR") 
+
+ggplot(filtered2_df, aes(x = timestamp, y = capacity, color = factor(jump_cluster))) +
+  geom_point() +
+  labs(x = "Timestamp", y = "Capacity", color = "Jump Cluster") +
+  theme_minimal()
+
