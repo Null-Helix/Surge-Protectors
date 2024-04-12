@@ -10,8 +10,6 @@ export const SearchBar = ({ setResults, clearResult }) => {
     clearResult: PropTypes.any,
   };
 
-  console.log(clearResult);
-
   useEffect(() => {
     setInput('');
   }, [clearResult]);
@@ -23,7 +21,6 @@ export const SearchBar = ({ setResults, clearResult }) => {
         const results = json.filter((hostName) => {
           return value && hostName && hostName.includes(value);
         });
-        console.log(results);
         setResults(results);
       });
   };
