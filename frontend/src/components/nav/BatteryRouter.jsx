@@ -4,6 +4,8 @@ import BatteryData from '../BatteryData';
 import BatteryError from './pages/BatteryError';
 import BatteryInfo from './pages/BatteryInfo';
 import BatteryStat from './pages/BatteryStat';
+import BatteryTable from './pages/BatteryTable';
+
 export default function BatteryRouter() {
   return (
     <BrowserRouter>
@@ -15,6 +17,7 @@ export default function BatteryRouter() {
 
           <Route path='battery-info' element={<BatteryInfo />} />
           <Route path='battery-stat/*' element={<BatteryStat />}></Route>
+          <Route path='battery-table' element={<BatteryTable />} />
 
           {/* Error page when route doesn't match */}
           <Route path='*' element={<BatteryError />} />

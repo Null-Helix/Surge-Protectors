@@ -45,6 +45,9 @@ export default function BatteryNavBar() {
               <Nav.Link as={Link} to='/battery-info' className='text-black'>
                 Battery Info
               </Nav.Link>
+              <Nav.Link as={Link} to='/battery-table' className='text-black'>
+                Battery Table
+              </Nav.Link>
             </Nav>
             <div className='mr-auto'>
               <div className='search-bar-container'>
