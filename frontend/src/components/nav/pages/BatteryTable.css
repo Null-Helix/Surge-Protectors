@@ -1,0 +1,39 @@
+
+.table-row {
+display: flex;
+justify-content: space-between; 
+align-items: stretch; 
+}
+
+.blist {
+    flex-basis: calc(25% - 10px); 
+    margin: 5px; 
+    text-align: center;
+    padding: 20px;
+    border-radius: 4px;
+    background: white;
+    border: 1px solid #b992d1;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    
+}
+
+.table-number {
+font-size: 24px; 
+color:rgb(70, 70, 70)
+}
+
+
+.condition{
+    font-size: 15px;
+    color:green 
+}
+
+.value-status {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
