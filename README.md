@@ -8,8 +8,7 @@
 ## - python3 main.py
 ## 4. Open localhost connection
 # How the code works:
-## -This repository stores a frontend and backend to analyze parsed battery data from GE HealthCare's
-## Portrait Mobile patient monitoring system
+## -This repository stores a frontend and backend to analyze parsed battery data from GE HealthCare's Portrait Mobile patient monitoring system
 ## -The backend is through Python Flask
 ## -The frontend is through React
 # What works:
