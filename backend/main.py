@@ -101,17 +101,7 @@ class HubInfo(Resource):
         if len(filtered_data) > max_points_to_display:
             filtered_data = filtered_data.sample(n=max_points_to_display)
 
-        # cycle_data = {}
-
-        # for index, row in filtered_data.iterrows():
-        #     cycle = row['cycle']
-            
-        #     if cycle not in cycle_data:
-        #         cycle_data[cycle] = []
-            
-        #     cycle_data[cycle].append(row.to_dict())
-        
-        # json_data = json.dumps(cycle_data, indent=1)
+        filtered_data.sort_values(by='timestamp', inplace=True)
 
         json_data = filtered_data.to_json(indent = 1, orient='records')
 
