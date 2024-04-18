@@ -22,6 +22,8 @@ export default function BatteryLanding() {
   const [dischargeCycleToggle, setDischargeCycleToggle] = useState(false);
   const [minStat, setMinStat] = useState(0);
   const [maxStat, setMaxStat] = useState(0);
+  const [minCycle, setMinCycle] = useState(0);
+  const [maxCycle, setMaxCycle] = useState(0);
   const [batteryData, setBatteryData] = useState([]);
   const [tmpData, setTmpData] = useState([]);
   const [logData, setLogData] = useState([]);
@@ -58,6 +60,24 @@ export default function BatteryLanding() {
             maxStatistic = data[stat.toLowerCase()];
           }
         });
+
+        if (!dischargeCycleToggle) {
+          let minCycle = result[0]['cycle'];
+          let maxCycle = result[0]['cycle'];
+
+          result.forEach((data) => {
+            const currentCycle = data['cycle'];
+            if (currentCycle < minCycle) {
+              minCycle = currentCycle;
+            }
+            if (currentCycle > maxCycle) {
+              maxCycle = currentCycle;
+            }
+          });
+
+          setMinCycle(minCycle);
+          setMaxCycle(maxCycle);
+        }
 
         setMinStat(minStatistic);
         setMaxStat(maxStatistic);
@@ -181,29 +201,39 @@ export default function BatteryLanding() {
 
   return (
     <>
-      <Container madWidth="sm">
-          <Row>
-            {
-              //Use Object.keys to map the fields in the logData object
-              Object.keys(logData).map((key) => {
-                //console.log(key, "hello");
-                //return a Card object showing the title and statistic
-                return (
-                  <Col key={key} sm={6} md={6} lg={3} xl={3}>
-                    <Card style={{ backgroundColor: '#650acd' }} title={key}>
-                      <h1 style={{ color: 'white', fontSize: 20, textAlign: 'center' }}>
-                        {key.replace(/_/g, ' ')}:
-                      </h1>
-                      <h2 style={{ backgroundColor: 'white', textAlign: 'center'}}>
-                        {logData[key]}
-                      </h2>
-                    </Card>
-                  </Col>
-                );
-              })
-            }
-          </Row>
-        </Container>
+      <Container madWidth='sm'>
+        <Row>
+          {
+            //Use Object.keys to map the fields in the logData object
+            Object.keys(logData).map((key) => {
+              //console.log(key, "hello");
+              //return a Card object showing the title and statistic
+              return (
+                <Col key={key} sm={6} md={6} lg={3} xl={3}>
+                  <Card style={{ backgroundColor: '#650acd' }} title={key}>
+                    <h1
+                      style={{
+                        color: 'white',
+                        fontSize: 20,
+                        textAlign: 'center',
+                        margin: 8,
+                        paddingBottom: 8,
+                      }}
+                    >
+                      {key.replace(/_/g, ' ')}:
+                    </h1>
+                    <h2
+                      style={{ backgroundColor: 'white', textAlign: 'center' }}
+                    >
+                      {logData[key]}
+                    </h2>
+                  </Card>
+                </Col>
+              );
+            })
+          }
+        </Row>
+      </Container>
       <link
         href='https://fonts.googleapis.com/css?family=Source+Sans+Pro'
         rel='stylesheet'
@@ -324,7 +354,11 @@ export default function BatteryLanding() {
                     setDischargeCycleToggle(!dischargeCycleToggle)
                   }
                   type='switch'
-                  label='Show Discharge Cycles'
+                  label={
+                    dischargeCycleToggle
+                      ? 'Reset Discharge Cycles'
+                      : 'Modify Discharge Cycles'
+                  }
                 />
               </Form>
             </div>
@@ -334,20 +368,40 @@ export default function BatteryLanding() {
                 style={{
                   padding: 20,
                   alignContent: 'center',
-                  width: 175,
+                  width: 220,
                   paddingTop: 0,
                 }}
               >
                 <Form>
                   <Form.Group>
-                    <Form.Label>Discharge Cycle</Form.Label>
+                    <Form.Label>Discharge Cycle Range</Form.Label>
+                    <div className='range-line'>
+                      <div className='start-marker'></div>
+                      <div className='end-marker'></div>
+                      <div className='marker-label' style={{ left: 0 }}>
+                        {minCycle}
+                      </div>
+                      <div className='marker-label' style={{ right: 0 }}>
+                        {maxCycle}
+                      </div>
+                    </div>
                     <Form.Control
+                      style={{ width: '130px' }}
                       defaultValue={1}
                       onChange={(e) => setDischargeCycle(e.target.value)}
                     ></Form.Control>
                   </Form.Group>
-                  <div style={{ marginTop: 7 }}>
-                    <Button onClick={() => getData()}>Submit</Button>
+                  <div style={{ marginTop: 16 }}>
+                    <Button
+                      style={{
+                        backgroundColor: '#800080', // Purple color
+                        borderColor: '#800080', // Border color (same as background for a solid look)
+                        color: '#fff', // Text color (white)
+                      }}
+                      onClick={getData}
+                    >
+                      Submit
+                    </Button>
                   </div>
                 </Form>
               </div>

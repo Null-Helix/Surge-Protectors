@@ -2,7 +2,6 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import BatteryLanding from './pages/BatteryLanding';
 import BatteryData from '../BatteryData';
 import BatteryError from './pages/BatteryError';
-import BatteryInfo from './pages/BatteryInfo';
 import BatteryStat from './pages/BatteryStat';
 export default function BatteryRouter() {
   return (
@@ -13,7 +12,6 @@ export default function BatteryRouter() {
           {/* Lading page/ homepage */}
           <Route index element={<BatteryLanding />} />
 
-          <Route path='battery-info' element={<BatteryInfo />} />
           <Route path='battery-stat/*' element={<BatteryStat />}></Route>
 
           {/* Error page when route doesn't match */}

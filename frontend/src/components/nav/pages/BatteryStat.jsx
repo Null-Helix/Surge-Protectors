@@ -36,14 +36,12 @@ export default function BatteryStat() {
     fetchData();
   }, [hostName]);
 
+  const capitalizeFirstLetter = (str) => {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  };
+
   const renderBoxPlots = () => {
-    const statsToPlot = [
-      'cycle',
-      'temperature',
-      'voltage',
-      'current',
-      'capacity',
-    ];
+    const statsToPlot = ['temperature', 'voltage', 'current', 'capacity'];
     const boxPlots = [];
 
     for (const statName of statsToPlot) {
@@ -73,11 +71,15 @@ export default function BatteryStat() {
 
       boxPlots.push(
         <div key={statName}>
-          <h2>{statName}</h2>
           <Plot
             data={traces}
             layout={{
-              title: `Box Plot for ${statName} across Devices`,
+              title: {
+                text: `Distribution of <b>${capitalizeFirstLetter(
+                  statName
+                )}</b> data for <b>${hostName}</b>`,
+                font: { size: 16 },
+              },
               yaxis: { title: yAxisLabel },
             }}
           />

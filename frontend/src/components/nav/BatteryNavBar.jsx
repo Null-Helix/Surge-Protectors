@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import GELogo from '../../assets/GELogo.png';
 import { SearchBar } from './pages/SearchBar';
 import { SearchResultsList } from './pages/SearchResultsList';
+import Button from 'react-bootstrap/Button';
 
 export default function BatteryNavBar() {
   const [results, setResults] = useState([]);
@@ -42,9 +43,10 @@ export default function BatteryNavBar() {
               <Nav.Link as={Link} to='/' className='text-black'>
                 Home
               </Nav.Link>
-              <Nav.Link as={Link} to='/battery-info' className='text-black'>
-                Battery Info
-              </Nav.Link>
+
+              <Link to={'https://www.google.com/'} className='purple-button'>
+                Log Analysis
+              </Link>
             </Nav>
             <div className='mr-auto'>
               <div className='search-bar-container'>

@@ -277,3 +277,52 @@ thead th:hover {
     background-position: 200% center;
   }
 }
+
+.range-line {
+  position: relative;
+  width: 80%; /* Adjust the width of the range line */
+  height: 10px; /* Adjust the height of the range line */
+  background-color: #f0f0f0; /* Light gray background */
+  border-radius: 5px; /* Rounded corners */
+  margin-bottom: 38px;
+}
+.start-marker,
+.end-marker {
+  position: absolute;
+  width: 12px;
+  height: 13px; /* Adjust the height of the markers */
+  background-color: #9f0be4; /* Blue color */
+  border-radius: 50%; /* Circle shape */
+  top: -3px; /* Position above the range line */
+}
+.start-marker {
+  left: 0; /* Position at the start of the range line */
+}
+.end-marker {
+  right: 0; /* Position at the end of the range line */
+}
+.marker-label {
+  position: absolute;
+  top: 20px; /* Position below the range line */
+  font-size: 12px;
+  color: #333;
+}
+
+.purple-button {
+  display: inline-block;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #fff;
+  background-color: #941394; /* Purple color */
+  border: 2px solid #800080;
+  border-radius: 13px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+
+  /* Hover effect */
+  &:hover {
+    background-color: #4b004b; /* Darker shade of purple on hover */
+    border-color: #4b004b;
+  }
+}
