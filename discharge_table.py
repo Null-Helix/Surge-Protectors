@@ -58,12 +58,14 @@ if compute_spo2_cluster:
     plt.ylabel("Frequency")
     plt.title("Distribution of Hours Used for SPO2SENSOR Batteries")
     plt.savefig("spo2_histogram.png")  # Save histogram as PNG
+    plt.clf()
 
     # Boxplot for SPO2SENSOR
     plt.boxplot(spo2_cluster_lengths["hours"])
     plt.title("Distribution of Hours Used for SPO2SENSOR Batteries")
     plt.ylabel("Hours")
     plt.savefig("spo2_boxplot.png")
+    plt.clf()
 
 # Calculate resp cluster lengths if required
 if compute_resp_cluster:
@@ -90,12 +92,14 @@ if compute_resp_cluster:
     plt.ylabel("Frequency")
     plt.title("Distribution of Hours Used for RESPSENSOR Batteries")
     plt.savefig("resp_histogram.png")
+    plt.clf()
 
     # Boxplot for RESPSENSOR
     plt.boxplot(resp_cluster_lengths["hours"])
     plt.title("Distribution of Hours Used for RESPSENSOR Batteries")
     plt.ylabel("Hours")
     plt.savefig("resp_boxplot.png")
+    plt.clf()
 
 # Create combined plot if required
 if create_combined_plot:
@@ -125,3 +129,4 @@ if create_combined_plot:
     plt.xlabel("Sensor")
     plt.ylabel("Hours")
     plt.savefig("comparison_boxplot.png")
+    plt.clf()
