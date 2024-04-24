@@ -1,0 +1,111 @@
+---
+title: "clustering_1"
+output: html_document
+date: "2024-04-24"
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = FALSE}
+#install.packages("ggplot2")
+#install.packages("dpylr")
+#install.packages("tidyr")
+#install.packages("readr")
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(readr)
+```
+
+```{r, echo=FALSE}
+df = read_csv("BatteryTableAllLogs.csv")
+df$timestamp <- as.POSIXct(df$timestamp)
+reference_time <- as.POSIXct("2021-01-01 00:00:00")
+```
+
+```{r}
+df$timestamp <- as.POSIXct(df$timestamp)
+df$second <- as.numeric(difftime(df$timestamp, reference_time, units = "secs"))
+df$minute <- as.numeric(difftime(df$timestamp, reference_time, units = "mins"))
+```
+
+## Normalized Capacity and Minutes
+
+```{r}
+host_df = df %>%
+  filter(hostName == "44-4b-5d-01-04-79", device == "SPO2SENSOR") %>%
+  mutate(norm_cap = (capacity - mean(capacity)/sd(capacity)))
+```
+
+```{r}
+library(dbscan)
+library(dplyr)
+
+data <- host_df %>%
+  select(minute, norm_cap)
+
+dbscan_result <- dbscan(data, eps = 5, minPts = 1)
+cluster_labels <- dbscan_result$cluster
+```
+
+```{r}
+host_df$cluster = cluster_labels
+
+ggplot(host_df, aes(x = timestamp, y = capacity, color = factor(cluster))) +
+  geom_point() +
+  labs(x = "Timestamp", y = "Capacity", color = "Cluster") +
+  ggtitle("Capacity vs. Timestamp with Clustering") +
+  theme_minimal()
+```
+
+
+```{r}
+filtered_df = host_df %>% filter(cluster %in% c(24:25))
+
+ggplot(filtered_df, aes(x = timestamp, y = capacity, color = factor(cluster))) +
+  geom_point() +
+  labs(x = "Timestamp", y = "Capacity", color = "Cluster") +
+  ggtitle("Capacity vs. Timestamp with Clustering") +
+  theme_minimal()
+```
+
+## Smaller capacity units
+
+```{r}
+host_df2 = df %>%
+  filter(hostName == "44-4b-5d-01-04-01", device == "SPO2SENSOR") %>%
+  mutate(capacity = capacity/100) 
+```
+
+```{r}
+library(dbscan)
+library(dplyr)
+
+data <- host_df2 %>%
+  select(minute, capacity)
+
+dbscan_result <- dbscan(data, eps = 3, minPts = 2)
+cluster_labels <- dbscan_result$cluster
+```
+
+```{r}
+host_df2$cluster = cluster_labels
+
+ggplot(host_df2, aes(x = timestamp, y = capacity, color = factor(cluster))) +
+  geom_point() +
+  labs(x = "Timestamp", y = "Capacity", color = "Cluster") +
+  ggtitle("Capacity vs. Timestamp with Clustering") +
+  theme_minimal()
+```
+
+```{r}
+filtered_df = host_df %>% filter(cluster %in% c(30:31))
+
+ggplot(filtered_df, aes(x = timestamp, y = capacity, color = factor(cluster))) +
+  geom_point() +
+  labs(x = "Timestamp", y = "Capacity", color = "Cluster") +
+  ggtitle("Capacity vs. Timestamp with Clustering") +
+  theme_minimal()
+```
