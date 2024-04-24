@@ -5,25 +5,39 @@ import { DNA } from 'react-loader-spinner';
 
 export default function BatteryStat() {
   const [hostName, setHostName] = useContext(HostNameContext);
-  const [data, setData] = useState([]);
+  const [five_num_data, set_five_num_data] = useState([]);
+  const [cycleTimeStampData, setCycleTimeStampData] = useState([]);
   const [stat, setStat] = useState([]);
   const [anomalyCount, setAnomalyCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [dischargeData, setDischargeData] = useState({});
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
+
+        const cycle_timestamp_url = `http://127.0.0.1:5001/cycle_timestamp/${hostName}`;
         const five_num_url = `http://127.0.0.1:5001/stat_five_number_summary/${hostName}`;
         const stat_url = `http://127.0.0.1:5001/stat/${hostName}`;
+        const discharge_graph_url = `http://127.0.0.1:5001/discharge/${hostName}`;
 
         const responseFiveNum = await fetch(five_num_url);
         const dataFiveNum = await responseFiveNum.json();
-        setData(dataFiveNum);
+        set_five_num_data(dataFiveNum);
 
         const responseStat = await fetch(stat_url);
         const dataStat = await responseStat.json();
         setStat(dataStat);
+
+        const responseCycleTimeStampData = await fetch(cycle_timestamp_url);
+        const dataCycleTimeStamp = await responseCycleTimeStampData.json();
+        setCycleTimeStampData(dataCycleTimeStamp);
+
+        const dischargeResponse = await fetch(discharge_graph_url);
+        const discharge = await dischargeResponse.json();
+        setDischargeData(discharge);
+        console.log('DischargeData', discharge);
 
         console.log('Stat:', dataStat);
       } catch (error) {
@@ -58,7 +72,7 @@ export default function BatteryStat() {
         yAxisLabel = 'Current (mA)';
       }
 
-      for (const [device, stats] of Object.entries(data)) {
+      for (const [device, stats] of Object.entries(five_num_data)) {
         const stat = stats[statName];
         const trace = {
           y: Object.values(stat),
@@ -87,6 +101,47 @@ export default function BatteryStat() {
       );
     }
     return boxPlots;
+  };
+
+  const CycleTimelinePlot = () => {
+    const cycles = [...new Set(cycleTimeStampData.map((item) => item.cycle))];
+
+    const traces = cycles.map((cycle, index) => {
+      const cycleData = cycleTimeStampData.filter(
+        (item) => item.cycle === cycle
+      );
+
+      return {
+        x: cycleData.map((item) => item.timestamp),
+        y: cycleData.map((item) => item.capacity),
+        mode: 'markers',
+        type: 'scatter',
+        name: `Cycle ${cycle}`,
+        marker: {
+          color: `hsl(${index * (360 / cycles.length)}, 50%, 50%)`,
+        },
+      };
+    });
+
+    const layout = {
+      title: 'Cycle Timeline with Capacity',
+      xaxis: {
+        title: 'Timestamp',
+      },
+      yaxis: {
+        title: 'Capacity',
+      },
+      showlegend: true,
+      legend: {
+        orientation: 'v',
+        x: 1.02,
+        y: 0.5,
+        xanchor: 'left',
+        yanchor: 'middle',
+      },
+    };
+
+    return <Plot data={traces} layout={layout} />;
   };
 
   return (
@@ -120,6 +175,16 @@ export default function BatteryStat() {
         </div>
       ) : (
         <>
+          {/* <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+            }}
+          >
+            {CycleTimelinePlot()}
+          </div> */}
+
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <h1 className='animate-character'>Battery Statistics</h1>
           </div>
@@ -204,6 +269,71 @@ export default function BatteryStat() {
                         {anomalyCount}
                       </span>
                     </p>
+
+                    <p style={{ paddingTop: '12px' }}>
+                      <strong
+                        style={{
+                          color: '#ea8c15',
+                          fontSize: '20px',
+                          marginRight: '8px',
+                        }}
+                      >
+                        Shortest time SPO2 batteries used before swap:
+                      </strong>{' '}
+                      {dischargeData ? (
+                        <span
+                          style={{
+                            fontSize: '20px',
+                            fontWeight: 'normal',
+                          }}
+                        >
+                          {dischargeData.min_minutes_spo2}
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: '20px',
+                            fontWeight: 'normal',
+                            color: 'red',
+                          }}
+                        >
+                          Unknown
+                        </span>
+                      )}
+                    </p>
+
+                    <p style={{ paddingTop: '12px' }}>
+                      <strong
+                        style={{
+                          color: '#ea8c15',
+                          fontSize: '20px',
+
+                          marginRight: '8px',
+                        }}
+                      >
+                        Longest time SPO2 batteries used before swap:
+                      </strong>{' '}
+                      {dischargeData ? (
+                        <span
+                          style={{
+                            fontSize: '20px',
+                            fontWeight: 'normal',
+                          }}
+                        >
+                          {dischargeData.max_minutes_spo2}
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: '20px',
+                            fontWeight: 'normal',
+                            color: 'red',
+                          }}
+                        >
+                          Unknown
+                        </span>
+                      )}
+                    </p>
                   </div>
 
                   {/* Right Column in Middle */}
@@ -252,7 +382,7 @@ export default function BatteryStat() {
                         lineHeight: '1.5',
                       }}
                     >
-                      <p>
+                      <p style={{ paddingTop: '12px' }}>
                         <strong
                           style={{
                             fontWeight: 'bold',
@@ -274,6 +404,73 @@ export default function BatteryStat() {
                         >
                           {stat ? <>{stat.latest_date}</> : <>None</>}
                         </span>
+                      </p>
+
+                      <p style={{ paddingTop: '12px' }}>
+                        <strong
+                          style={{
+                            color: '#55aa62',
+
+                            fontSize: '20px',
+
+                            marginRight: '8px',
+                          }}
+                        >
+                          Shortest time RESP batteries used before swap:
+                        </strong>{' '}
+                        {dischargeData ? (
+                          <span
+                            style={{
+                              fontSize: '20px',
+                              fontWeight: 'normal',
+                            }}
+                          >
+                            {dischargeData.min_minutes_resp}
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: '20px',
+                              fontWeight: 'normal',
+                              color: 'red',
+                            }}
+                          >
+                            Unknown
+                          </span>
+                        )}
+                      </p>
+
+                      <p style={{ paddingTop: '12px' }}>
+                        <strong
+                          style={{
+                            color: '#55aa62',
+                            fontSize: '20px',
+
+                            marginRight: '8px',
+                          }}
+                        >
+                          Longest time RESP batteries used before swap:
+                        </strong>{' '}
+                        {dischargeData ? (
+                          <span
+                            style={{
+                              fontSize: '20px',
+                              fontWeight: 'normal',
+                            }}
+                          >
+                            {dischargeData.max_minutes_resp}
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: '20px',
+                              fontWeight: 'normal',
+                              color: 'red',
+                            }}
+                          >
+                            Unknown
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -541,35 +738,7 @@ export default function BatteryStat() {
             </section>
           </div>
 
-          {/* <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <Table striped hover style={{ maxWidth: '85%' }}>
-          <thead style={{ background: '#f2f2f2' }}>
-            <tr>
-              <th>Device Type</th>
-              <th>Temperature Status</th>
-              <th>Voltage Status</th>
-            </tr>
-          </thead>
-          <tbody style={{ background: 'white' }}>
-            <tr>
-              <td>Hub</td>
-              <td>Mark</td>
-              <td>Otto</td>
-            </tr>
-            <tr>
-              <td>SPO2 Sensor</td>
-              <td>Jacob</td>
-              <td>Thornton</td>
-            </tr>
-            <tr>
-              <td>Respiratory Sensor</td>
-              <td colSpan={2}>Larry the Bird</td>
-            </tr>
-          </tbody>
-        </Table>
-      </div>
-      */}
-
+          {/*  Box Plot */}
           <div
             style={{
               display: 'flex',

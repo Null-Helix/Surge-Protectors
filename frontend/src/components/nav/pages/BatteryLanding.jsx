@@ -116,6 +116,7 @@ export default function BatteryLanding() {
         }
 
         const data = await response.json();
+
         setLogData(data);
       } catch (error) {
         console.error('Fetch error:', error);
@@ -201,7 +202,7 @@ export default function BatteryLanding() {
 
   return (
     <>
-      <Container madWidth='sm'>
+      <Container madwidth='sm'>
         <Row>
           {
             //Use Object.keys to map the fields in the logData object
