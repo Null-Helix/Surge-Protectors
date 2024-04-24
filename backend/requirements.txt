@@ -14,3 +14,4 @@ pandas
 flask-cors
 numpy
 matplotlib
+seaborn

@@ -11,6 +11,7 @@ import json
 import os
 import numpy as np
 from datetime import datetime
+import seaborn as sns
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -20,6 +21,19 @@ cache = SimpleCache()
 csvfile = os.path.join(".", "BatteryTableAllLogs.csv")
 hub_df = pd.read_csv(csvfile)
 matplotlib.use('Agg') 
+
+def calculate_jump_clusters(group):
+    capacity_diff = group["capacity"] - group["capacity"].shift(fill_value=group["capacity"].iloc[0])
+    jump_clusters = (capacity_diff > 5).cumsum()
+    
+    group["jump_cluster"] = jump_clusters
+
+    return group
+
+def convert_minutes_to_hours_minutes(minutes):
+    hours = minutes // 60
+    remaining_minutes = minutes % 60
+    return f"{int(hours)}h {int(remaining_minutes)}m"
     
 class Plot(Resource):
     def get(self, hostname, device, stat, dischargeCycle = None):
@@ -122,7 +136,6 @@ class HostName(Resource):
     
 class LogDataInfo(Resource):
     def get(self):
-        print("LogData")
         file_path = 'logData.txt'
         data = {}
 
@@ -140,7 +153,6 @@ class LogDataInfo(Resource):
                 data['Data_size_after_parsing'] = line.split(': ')[1].strip()
         
         json_data = json.dumps(data, indent=4)
-        print(json_data)
         return Response(json_data, mimetype='application/json')
 
 class StatFiveNumberSummary(Resource):
@@ -198,6 +210,21 @@ class StatFiveNumberSummary(Resource):
 
         return jsonify(summaries)
 
+class CycleTimeStampData(Resource):
+    def get(self, hostname):
+        filtered_data = hub_df[(hub_df['hostName'] == hostname)]
+        desired_attributes = ["timestamp", "cycle", 'capacity']
+        filtered_data = filtered_data[desired_attributes]
+
+        max_points_to_display = 10000
+        if len(filtered_data) > max_points_to_display:
+            filtered_data = filtered_data.sample(n=max_points_to_display)
+        
+        filtered_data.sort_values(by='timestamp', inplace=True)
+
+        json_data = filtered_data.to_json(indent = 1, orient='records')
+        return Response(json_data, mimetype='application/json')
+
 class Stat(Resource):
     def get(self, hostname):
 
@@ -242,14 +269,113 @@ class Stat(Resource):
                 'max_cycle': int(stats['cycle'])
             }
 
-        data['max_voltage'] = float(max_voltage)
-        data['min_voltage'] = float(min_voltage)
-        data['max_temperature'] = float(max_temperature)
-        data['earliest_date'] = earliest_date
-        data['latest_date'] = latest_date
-        data['device_stats'] = device_stats
+        json_serializable_data = {
+            'max_voltage': float(max_voltage),
+            'min_voltage': float(min_voltage),
+            'max_temperature': float(max_temperature),
+            'earliest_date': str(earliest_date),  
+            'latest_date': str(latest_date),  
+            'device_stats': device_stats
+        }
+
+        # Serialize data to JSON
+        json_data = json.dumps(json_serializable_data)
+       
+        return Response(json_data, mimetype='application/json')
+    
+class DischargeDataPerHost(Resource):
+    def get(self, hostname):
         
-        return jsonify(data)
+        cached_response = cache.get(hostname + "discharge")
+
+        if cached_response:
+            return jsonify(cached_response)
+        
+        clustered_df = hub_df[(hub_df["hostName"] == hostname)]
+
+        clustered_df = (
+            clustered_df
+            .sort_values(by=["hostName", "device", "timestamp"])
+        )
+
+        print(clustered_df)
+
+        clustered_df.loc[: , 'timestamp'] = pd.to_datetime(clustered_df['timestamp'])
+
+        filtered_df_spo2 = clustered_df[(clustered_df["device"] == "SPO2SENSOR")]
+        if filtered_df_spo2.empty:
+            return
+
+        filtered_df_resp = clustered_df[(clustered_df["device"] == "RESPSENSOR")]
+
+        spo2_cluster_lengths = (
+            filtered_df_spo2
+            .groupby(["hostName", "cycle"])
+            .agg(
+                mins=("timestamp", lambda x: (x.max() - x.min()).total_seconds() / 60),
+                hours=("timestamp", lambda x: (x.max() - x.min()).total_seconds() / 3600)
+            )
+            .reset_index()
+        )
+
+        resp_cluster_lengths = (
+            filtered_df_resp
+            .groupby(["hostName", "cycle"])
+            .agg(
+                mins=("timestamp", lambda x: (x.max() - x.min()).total_seconds() / 60),
+                hours=("timestamp", lambda x: (x.max() - x.min()).total_seconds() / 3600)
+            )
+            .reset_index()
+        )
+
+        min_hours_resp = convert_minutes_to_hours_minutes(resp_cluster_lengths['mins'].min())
+        max_hours_resp = convert_minutes_to_hours_minutes(resp_cluster_lengths['mins'].max())
+        min_hours_spo2 = convert_minutes_to_hours_minutes(spo2_cluster_lengths['mins'].min())
+        max_hours_spo2 = convert_minutes_to_hours_minutes(spo2_cluster_lengths['mins'].max())
+
+        response_data = {
+            "min_minutes_resp": min_hours_resp,
+            "max_minutes_resp": max_hours_resp,
+            "min_minutes_spo2": min_hours_spo2,
+            "max_minutes_spo2": max_hours_spo2,
+        }
+
+        cache.set(hostname + "discharge", response_data)
+
+        return jsonify(response_data)
+    
+class WholeDischargeData(Resource):
+    def get(self):
+        cached_response = cache.get("WholeDischarge")
+        if cached_response:
+            return jsonify(cached_response)
+        
+        clustered_df = (
+            hub_df
+            .sort_values(by=["hostName", "device", "timestamp"])
+        )
+
+        clustered_df.loc[: , 'timestamp'] = pd.to_datetime(clustered_df['timestamp'])
+
+        filtered_df_spo2 = clustered_df[(clustered_df["device"] == "SPO2SENSOR")]
+        
+        spo2_cluster_lengths = (
+            filtered_df_spo2
+            .groupby(["hostName", "cycle"])
+            .agg(
+                mins=("timestamp", lambda x: (x.max() - x.min()).total_seconds() / 60),
+                hours=("timestamp", lambda x: (x.max() - x.min()).total_seconds() / 3600)
+            )
+            .reset_index()
+        )
+
+        print("Cluter", spo2_cluster_lengths)
+
+        response_data = {
+            "spo2_data": spo2_cluster_lengths
+        }
+
+        return jsonify(response_data)
 
 api.add_resource(Plot, "/plot/<string:hostname>/<string:device>/<string:stat>", "/plot/<string:hostname>/<string:device>/<string:stat>/<string:dischargeCycle>")
 api.add_resource(HubInfo, "/hubinfo/<string:hostname>/<string:device>/<string:stat>", "/hubinfo/<string:hostname>/<string:device>/<string:stat>/<string:dischargeCycle>")
@@ -257,6 +383,9 @@ api.add_resource(HostName, "/hostnames")
 api.add_resource(LogDataInfo, "/loginfo")
 api.add_resource(StatFiveNumberSummary, "/stat_five_number_summary/<string:hostname>")
 api.add_resource(Stat, "/stat/<string:hostname>")
+api.add_resource(CycleTimeStampData, "/cycle_timestamp/<string:hostname>")
+api.add_resource(DischargeDataPerHost, "/discharge/<string:hostname>")
+api.add_resource(WholeDischargeData, "/whole_discharge")
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
