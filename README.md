@@ -40,4 +40,4 @@ Summary about amount of data we have processed at the landing page.
 
 ### What doesn't work:
 
-Any features we could not complete in time were not included in the final product.
+Histogram showing the battery usage for RESP and SPO2 sensor at frontend. Scatter plot to compare different discharge cycles of RESP/SPO2 at stat page.
