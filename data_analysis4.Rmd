@@ -83,7 +83,14 @@ clustered_df <- df %>%
   arrange(hostName, device, timestamp) %>%
   group_by(hostName, device) %>%
   mutate(jump_cluster = cumsum(capacity - lag(capacity, default = first(capacity)) > 5 | 
-                                is.na(lag(capacity))))
+                                is.na(lag(capacity)))) %>%
+  ungroup()
+
+clustered_df %>% group_by(jump_cluster) %>%
+  mutate(max_capacity = max(capacity),
+    min_capacity = min(capacity),
+    change_in_capacity = max(capacity) - min(capacity),
+    discharge_rate = change_in_capacity/mins)
 ```
 
 ```{r, echo = FALSE}
@@ -113,11 +120,7 @@ spo2_cluster_lengths <- clustered_df %>%
   group_by(hostName, jump_cluster) %>%
   summarize(
     mins = as.numeric(difftime(max(timestamp), min(timestamp), units = "mins")),
-    hours = as.numeric(difftime(max(timestamp), min(timestamp), units = "hours")),
-    max_capacity = max(capacity),
-    min_capacity = min(capacity),
-    change_in_capacity = max(capacity) - min(capacity),
-    discharge_rate = change_in_capacity/mins
+    hours = as.numeric(difftime(max(timestamp), min(timestamp), units = "hours"))
   ) %>%
   ungroup()
 ```

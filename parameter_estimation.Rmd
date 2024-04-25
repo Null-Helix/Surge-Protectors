@@ -1,0 +1,60 @@
+---
+title: "parameter_estimation"
+output: html_document
+date: "2024-04-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dbscan)
+library(dplyr)
+library(ggplot2)
+
+# Load your data
+df <- read_csv("BatteryTableAllLogs.csv")
+
+df$timestamp <- as.POSIXct(df$timestamp)
+reference_time <- as.POSIXct("2021-01-01 00:00:00")
+
+df$timestamp <- as.POSIXct(df$timestamp)
+df$second <- as.numeric(difftime(df$timestamp, reference_time, units = "secs"))
+df$minute <- as.numeric(difftime(df$timestamp, reference_time, units = "mins"))
+
+```
+
+```{r}
+library(dbscan)
+library(dplyr)
+library(ggplot2)
+
+# Assuming you have already preprocessed your data
+host_df <- df %>%
+  filter(hostName == "44-4b-5d-01-04-91", device == "RESPSENSOR")
+
+# Subsampling ratio (adjust as needed)
+subsampling_ratio <- 0.5  # Use 10% of the data
+
+# Perform subsampling
+set.seed(123)  # Set seed for reproducibility
+df_subsampled <- host_df %>% sample_frac(subsampling_ratio)
+
+# Compute distances
+distances <- dist(df_subsampled[, c("capacity", "minute")])  # Adjust "x" and "y" with your actual columns
+k <- 2  # Number of nearest neighbors
+
+# Compute k-distance for each point
+k_distances <- apply(as.matrix(distances), 1, function(x) sort(x)[k])
+
+# Sort distances
+sorted_distances <- sort(k_distances, decreasing = FALSE)
+
+# Plot k-distance graph
+ggplot() +
+  geom_line(aes(x = 1:length(sorted_distances), y = sorted_distances)) +
+  labs(x = "Index", y = "Distance") +
+  ggtitle("K-Distance Graph")
+
+```

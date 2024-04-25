@@ -75,7 +75,7 @@ ggplot(filtered_df, aes(x = timestamp, y = capacity, color = factor(cluster))) +
 
 ```{r}
 host_df2 = df %>%
-  filter(hostName == "44-4b-5d-01-04-01", device == "SPO2SENSOR") %>%
+  filter(hostName == "44-4b-5d-01-04-91", device == "RESPSENSOR") %>%
   mutate(capacity = capacity/100) 
 ```
 
@@ -109,3 +109,5 @@ ggplot(filtered_df, aes(x = timestamp, y = capacity, color = factor(cluster))) +
   ggtitle("Capacity vs. Timestamp with Clustering") +
   theme_minimal()
 ```
+
+
