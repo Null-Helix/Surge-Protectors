@@ -1,5 +1,5 @@
 ---
-title: "Data_Analysis_2"
+title: "Data_Analysis_4"
 output: html_document
 date: "2024-03-15"
 ---
@@ -23,271 +23,96 @@ library(readr)
 df = read_csv("BatteryTableAllLogs.csv")
 ```
 
-# Data Analysis 2
-
-```{r, echo=FALSE}
-filtered_df <- df %>%
-  arrange(timestamp) %>%
-  filter(hostName == "44-4b-5d-01-04-21", device == "SPO2SENSOR") %>%
-  mutate(jump_cluster = cumsum(capacity - lag(capacity, default = first(capacity)) > 5))
-```
-
-## Question 1: How often is a battery swapped out?
-
-Original capacity time series for SPO2SENSOR devices for hostName: 44-4b-5d-01-04-21 
-
-```{r, echo = FALSE}
-ggplot(filtered_df, aes(x = timestamp, y = capacity)) +
-  geom_point() +
-  labs(x = "Timestamp", y = "Capacity", color = "Jump Cluster") +
-  theme_minimal()
-```
-
-Clustering time series into periods of decreasing capacity with jumps in capacity no greater than 5. This is the results for SPO2SENSOR devices for hostName: 44-4b-5d-01-04-21:
-
-```{r, echo = FALSE}
-library(ggplot2)
-ggplot(filtered_df, aes(x = timestamp, y = capacity, color = factor(jump_cluster))) +
-  geom_point() +
-  labs(x = "Timestamp", y = "Capacity", color = "Jump Cluster") +
-  theme_minimal()
-
-```
-
-Identifying how long each SPO2SENSOR battery was used before being swapped out:
-
-```{r, echo=FALSE, eval=FALSE}
-
-cluster_lengths <- filtered_df %>%
-  group_by(jump_cluster) %>%
-  summarize(
-    mins = difftime(max(timestamp), min(timestamp), units = "mins"),
-    hours = difftime(max(timestamp), min(timestamp), units = "hours") 
-  )
-
-knitr::kable(cluster_lengths, format = "markdown")
-
-```
-
-The longest amount of time these SPO2SENSOR batteries for hostName: 44-4b-5d-01-04-21 were used before being swapped out was roughly 22 hours(Cluster 1 and 5). The shortest time these SPO2SENSOR batteries for hostName: 44-4b-5d-01-04-21 were used before being swapped out was 3 hours(Cluster 3).
-
-```{r, echo = FALSE, eval=FALSE}
-mean(cluster_lengths$mins)
-mean(cluster_lengths$hours)
-```
-
-The average use time for SPO2SENSOR batteries before being swapped out for hostName: 44-4b-5d-01-04-21 is 17 hours.
+# Data Analysis 4
 
 ```{r, echo = FALSE}
 clustered_df <- df %>%
   arrange(hostName, device, timestamp) %>%
   group_by(hostName, device) %>%
   mutate(jump_cluster = cumsum(capacity - lag(capacity, default = first(capacity)) > 5 | 
-                                is.na(lag(capacity)))) %>%
-  ungroup()
-
-clustered_df %>% group_by(jump_cluster) %>%
-  mutate(max_capacity = max(capacity),
-    min_capacity = min(capacity),
-    change_in_capacity = max(capacity) - min(capacity),
-    discharge_rate = change_in_capacity/mins)
+                                is.na(lag(capacity))))
 ```
 
-```{r, echo = FALSE}
-filtered2_df <- clustered_df %>%
-  filter(hostName == "44-4b-5d-01-04-51", device == "SPO2SENSOR") 
+Identifying discharge rates for batteries used for SPO2SENSOR devices:
 
-ggplot(filtered2_df, aes(x = timestamp, y = capacity, color = factor(jump_cluster))) +
-  geom_point() +
-  labs(x = "Timestamp", y = "Capacity", color = "Jump Cluster") +
-  theme_minimal()
-```
-
-### How long are SPO2 devices used before being swapped out?
-
-For analysis purpose, not all hostNames will be used since some exhibit strange behavior for their SPO2SENSOR devices.
-
-Acceptable for SPO2SENSOR Clustering Analysis: 44-4b-5d-01-04-29, 44-4b-5d-01-04-91, 44-4b-5d-01-04-09, 44-4b-5d-01-04-89, 44-4b-5d-01-04-21, 44-4b-5d-01-04-11, 44-4b-5d-01-04-31, 44-4b-5d-01-04-39
-
-Strange Clustering - 44-4b-5d-01-04-01, 44-4b-5d-01-04-79, 44-4b-5d-01-04-81, 44-4b-5d-01-04-01, 44-4b-5d-01-04-19, 44-4b-5d-01-04-51
-No SPO2SENSOR Devices - 44-4b-5d-01-04-a1, 44-4b-5d-01-04-41, 44-4b-5d-01-04-b1
-
-```{r, echo=FALSE}
-spo2_cluster_lengths <- clustered_df %>%
+```{r}
+spo2_filtered_df = clustered_df %>%
   filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91",
                "44-4b-5d-01-04-09", "44-4b-5d-01-04-89", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-31",
-               "44-4b-5d-01-04-39"), device == "SPO2SENSOR", jump_cluster == 1) %>%
+               "44-4b-5d-01-04-39"), device == "SPO2SENSOR") %>%
   group_by(hostName, jump_cluster) %>%
+  summarize(diff_cap = max(capacity) - min(capacity), 
+            mins = as.numeric(difftime(max(timestamp), min(timestamp), units = "mins"))) %>%
+  mutate(discharge_rate = diff_cap/mins)
+```
+
+```{r}
+hist(spo2_filtered_df$discharge_rate, main = "Discharge Rates for SPO2 Sensor Batteries", xlab = "Discharge Rate(Capacity/Minute)", ylab = "Frequency")
+```
+
+```{r}
+summary(spo2_filtered_df$discharge_rate)
+```
+
+```{r, echo=FALSE, eval=FALSE}
+
+spo2_cluster_lengths <- filtered_df %>%
+  group_by(hostName) %>%
   summarize(
-    mins = as.numeric(difftime(max(timestamp), min(timestamp), units = "mins")),
-    hours = as.numeric(difftime(max(timestamp), min(timestamp), units = "hours"))
-  ) %>%
-  ungroup()
+    avg_discharge_rate = mean(discharge_rate) 
+  )
+
+knitr::kable(spo2_cluster_lengths, format = "markdown")
+
 ```
+
+
+
+
+
+
 
 ```{r, echo=FALSE}
-spo2_cluster_lengths %>% 
-  filter(hours == max(spo2_cluster_lengths$hours))
-
-spo2_cluster_lengths %>% 
-  filter(hours == min(spo2_cluster_lengths$hours))
-
-mean(spo2_cluster_lengths$hours)
-```
-
-```{r, echo = FALSE}
-hist(spo2_cluster_lengths$discharge_rate, xlab = "Capacity per Min", main = "Distribution of Discharging Rate for SPO2SENSOR Batteries")
-```
-
-```{r, echo=FALSE}
-boxplot(spo2_cluster_lengths$discharge_rate, main="Distribution of Capacity per Min SPO2SENSOR Batteries", ylab="Capacity per Minute")
-```
-
-
-### How long are RESP devices used before being swapped out?
-
-For analysis purpose, not all hostNames will be used since some exhibit strange behavior for their RESPSENSOR devices.
-
-Included in Clustering: 44-4b-5d-01-04-29, 44-4b-5d-01-04-91, 44-4b-5d-01-04-09, 44-4b-5d-01-04-51, 44-4b-5d-01-04-21, 44-4b-5d-01-04-11, 44-4b-5d-01-04-81, 44-4b-5d-01-04-31, 44-4b-5d-01-04-39
-Strange Clustering: 44-4b-5d-01-04-19, 44-4b-5d-01-04-79, 44-4b-5d-01-04-89, 44-4b-5d-01-04-01
-No RESP devices: 44-4b-5d-01-04-41, 44-4b-5d-01-04-a1, 44-4b-5d-01-04-b1
-
-```{r, echo=FALSE}
-resp_cluster_lengths <- clustered_df %>%
+resp_filtered_df <- clustered_df %>%
   filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91", "44-4b-5d-01-04-09", "44-4b-5d-01-04-51", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-81", "44-4b-5d-01-04-31", "44-4b-5d-01-04-39"), device == "RESPSENSOR") %>%
   group_by(hostName, jump_cluster) %>%
+  summarize(diff_cap = max(capacity) - min(capacity), 
+            mins = as.numeric(difftime(max(timestamp), min(timestamp), units = "mins"))) %>%
+  mutate(discharge_rate = diff_cap/mins)
+```
+
+```{r}
+hist(resp_filtered_df$discharge_rate, main = "Discharge Rates for RESP Sensor Batteries", xlab = "Discharge Rate(Capacity in Percentage/Minute)", ylab = "Frequency")
+```
+
+```{r}
+summary(resp_filtered_df$discharge_rate)
+```
+
+```{r, echo=FALSE, eval=FALSE}
+
+resp_cluster_lengths <- filtered_df %>%
+  group_by(hostName) %>%
   summarize(
-    mins = as.numeric(difftime(max(timestamp), min(timestamp), units = "mins")),
-    hours = as.numeric(difftime(max(timestamp), min(timestamp), units = "hours")) 
-  ) %>%
-  ungroup()
+    avg_discharge_rate = mean(discharge_rate) 
+  )
+
+knitr::kable(resp_cluster_lengths, format = "markdown")
+
 ```
 
-```{r, echo=FALSE}
-resp_cluster_lengths %>% 
-  filter(hours == max(resp_cluster_lengths$hours))
 
-resp_cluster_lengths %>% 
-  filter(hours == min(resp_cluster_lengths$hours))
 
-mean(resp_cluster_lengths$hours)
-```
-
-On average RESPSENSOR batteries over all hosts are used for 19.21 hours before being swapped out. The longest use was 33 hours in host 44-4b-5d-01-04-11 and the shortest use was 0.0169 hours in host 44-4b-5d-01-04-51.
 
 ```{r, echo = FALSE}
-hist(resp_cluster_lengths$hours, xlab = "Hours", main = "Distribution of Hours Used for RESPSENSOR Batteries")
-```
-
-Most RESPSENSOR batteries were used between 20-25 hours before being swapped out. Less than 5 RESPSENSOR battery usages were between 0-5 hours.
-
-```{r, echo=FALSE}
-require(car)
-qqPlot(resp_cluster_lengths$hours)
-```
-
-The QQPlot does not strongly suggest that the RESPSENSOR battery usages are normally distributed.
-
-```{r, echo=FALSE}
-boxplot(resp_cluster_lengths$hours, main="Distribution of Hours Used for RESPSENSOR Batteries", ylab="hours")
-```
-
-There are no outliers. 
-
-### Which Device is used for longer before being swapped?
-
-```{r, echo = FALSE}
-spo2_data <- data.frame(lengths = spo2_cluster_lengths$hours, sensor = "SPO2SENSOR")
-resp_data <- data.frame(lengths = resp_cluster_lengths$hours, sensor = "RESPSENSOR")
+spo2_data <- data.frame(lengths = spo2_filtered_df$discharge_rate, sensor = "SPO2SENSOR")
+resp_data <- data.frame(lengths = resp_filtered_df$discharge_rate, sensor = "RESPSENSOR")
 
 combined_data <- rbind(spo2_data, resp_data)
 
 ggplot(combined_data, aes(x = sensor, y = lengths, fill = sensor)) +
-  geom_boxplot() +
-  labs(title = "Sensor Battery Usage in Hours", x = "Sensor", y = "Hours") +
-  theme_minimal()
-```
-
-Visually, it appears that SPO2SENSOR batteries are used for longer than RESPSENSOR batteries.
-
-Permutation Test:
-
-```{r, echo = FALSE}
-resp_hours = resp_cluster_lengths$hours
-spo2_hours = spo2_cluster_lengths$hours
-obs = mean(resp_hours) - spo2_hours
-
-# Permutation test function
-permutation_test_mean_difference <- function(resp_hours, spo2_hours, num_permutations) {
-  # Compute observed mean difference
-  obs_diff <- mean(resp_hours) - mean(spo2_hours)
-  
-  # Combine hours from both sensors
-  combined_hours <- c(resp_hours, spo2_hours)
-  
-  # Initialize vector to store permuted mean differences
-  perm_diffs <- numeric(num_permutations)
-  
-  # Perform permutations
-  for (i in 1:num_permutations) {
-    # Shuffle the combined data
-    perm_data <- sample(combined_hours)
-    
-    # Compute mean difference for permuted sample
-    perm_diffs[i] <- mean(perm_data[1:length(resp_hours)]) - mean(perm_data[(length(resp_hours) + 1):length(combined_hours)])
-  }
-  
-  # Calculate p-value
-  p_value <- mean(perm_diffs >= obs_diff)
-  
-  # Return results
-  return(list(observed_difference = obs_diff, permuted_differences = perm_diffs, p_value = p_value))
-}
-
-# Usage
-set.seed(123) # For reproducibility
-num_permutations <- 1000
-test_result <- permutation_test_mean_difference(resp_hours, spo2_hours, num_permutations)
-print(test_result$p_value)
-
-
-```
-
-### Strange Clustering
-
-```{r, echo = FALSE}
-filtered2_df <- clustered_df %>%
-  filter(hostName == "44-4b-5d-01-04-51", device == "SPO2SENSOR") 
-
-ggplot(filtered2_df, aes(x = timestamp, y = capacity, color = factor(jump_cluster))) +
-  geom_point() +
-  labs(x = "Timestamp", y = "Capacity", color = "Jump Cluster") +
-  theme_minimal()
-```
-
-```{r}
-# Generate timestamps
-timestamps <- seq(as.POSIXct("2024-04-01 00:00:00"), as.POSIXct("2024-04-02 00:00:00"), by = "15 min")
-
-# Example data frame
-df <- data.frame(
-  Timestamp = timestamps,
-  Voltage = runif(length(timestamps), 3.5, 4.2),
-  Current = runif(length(timestamps), 0, 1),
-  Temperature = runif(length(timestamps), 25, 35),
-  Capacity = c(100:1) # Adjusted the length to match timestamps
-)
-
-# Threshold for capacity to identify discharging periods
-capacity_threshold <- 70
-
-# Create a new column to identify discharging time periods
-df$Discharging_Period <- ifelse(df$Capacity <= capacity_threshold, 1, 0)
-
-# Identify groups of discharging periods
-df$Discharging_Group <- cumsum(c(0, diff(df$Discharging_Period) != 0))
-
-# Output the dataframe
-print(df)
-
+  geom_boxplot(outlier.shape = NA) +  # Omit outliers
+  labs(title = "Sensor Battery Discharge Rates", x = "Sensor", y = "Capacity per min(percentage/min)") +
+  theme_minimal() +
+  ylim(0.025, 0.08)
 ```

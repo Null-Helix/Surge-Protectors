@@ -35,7 +35,7 @@ host_df <- df %>%
   filter(hostName == "44-4b-5d-01-04-91", device == "RESPSENSOR")
 
 # Subsampling ratio (adjust as needed)
-subsampling_ratio <- 0.5  # Use 10% of the data
+subsampling_ratio <- 1  # Use 10% of the data
 
 # Perform subsampling
 set.seed(123)  # Set seed for reproducibility
@@ -43,7 +43,7 @@ df_subsampled <- host_df %>% sample_frac(subsampling_ratio)
 
 # Compute distances
 distances <- dist(df_subsampled[, c("capacity", "minute")])  # Adjust "x" and "y" with your actual columns
-k <- 2  # Number of nearest neighbors
+k <- 4  # Number of nearest neighbors
 
 # Compute k-distance for each point
 k_distances <- apply(as.matrix(distances), 1, function(x) sort(x)[k])
