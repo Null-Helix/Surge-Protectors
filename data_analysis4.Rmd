@@ -26,24 +26,36 @@ df = read_csv("BatteryTableAllLogs.csv")
 # Data Analysis 4
 
 ```{r, echo = FALSE}
+
 clustered_df <- df %>%
   arrange(hostName, device, timestamp) %>%
   group_by(hostName, device) %>%
-  mutate(jump_cluster = cumsum(capacity - lag(capacity, default = first(capacity)) > 5 | 
-                                is.na(lag(capacity))))
+  mutate(time_diff = difftime(timestamp, lag(timestamp, default = first(timestamp)), units = "mins"),
+         jump_cluster = cumsum(capacity - lag(capacity, default = first(capacity)) >= 10 |
+                               capacity - lag(capacity, default = first(capacity)) <= -10 |
+                               time_diff > 30 | 
+                               is.na(time_diff) |
+                               (capacity == 0 & lag(capacity, default = first(capacity)) != 0))) %>%
+  group_by(hostName, device, jump_cluster) %>%
+  filter(n() >= 70) %>%
+  ungroup()
+
 ```
 
 Identifying discharge rates for batteries used for SPO2SENSOR devices:
 
+Acceptable for SPO2SENSOR Clustering Analysis: 44-4b-5d-01-04-29, 44-4b-5d-01-04-91, 44-4b-5d-01-04-09, 44-4b-5d-01-04-89, 44-4b-5d-01-04-21, 44-4b-5d-01-04-11, 44-4b-5d-01-04-31, 44-4b-5d-01-04-39, 44-4b-5d-01-04-01, 44-4b-5d-01-04-79, 44-4b-5d-01-04-81, 44-4b-5d-01-04-01, 44-4b-5d-01-04-19, 44-4b-5d-01-04-51
+
+No SPO2SENSOR Devices - 44-4b-5d-01-04-a1, 44-4b-5d-01-04-41, 44-4b-5d-01-04-b1
+
 ```{r}
 spo2_filtered_df = clustered_df %>%
-  filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91",
-               "44-4b-5d-01-04-09", "44-4b-5d-01-04-89", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-31",
-               "44-4b-5d-01-04-39"), device == "SPO2SENSOR") %>%
+  filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91", "44-4b-5d-01-04-09", "44-4b-5d-01-04-89", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-31", "44-4b-5d-01-04-39", "44-4b-5d-01-04-01", "44-4b-5d-01-04-79", "44-4b-5d-01-04-81", "44-4b-5d-01-04-01", "44-4b-5d-01-04-19"," 44-4b-5d-01-04-51"), device == "SPO2SENSOR") %>%
   group_by(hostName, jump_cluster) %>%
   summarize(diff_cap = max(capacity) - min(capacity), 
             mins = as.numeric(difftime(max(timestamp), min(timestamp), units = "mins"))) %>%
-  mutate(discharge_rate = diff_cap/mins)
+  mutate(discharge_rate = diff_cap/mins) %>%
+  filter(discharge_rate != 0)
 ```
 
 ```{r}
@@ -56,7 +68,7 @@ summary(spo2_filtered_df$discharge_rate)
 
 ```{r, echo=FALSE, eval=FALSE}
 
-spo2_cluster_lengths <- filtered_df %>%
+spo2_cluster_lengths <- spo2_filtered_df %>%
   group_by(hostName) %>%
   summarize(
     avg_discharge_rate = mean(discharge_rate) 
@@ -68,17 +80,20 @@ knitr::kable(spo2_cluster_lengths, format = "markdown")
 
 
 
+Valid: 
+44-4b-5d-01-04-29, 44-4b-5d-01-04-91, 44-4b-5d-01-04-09, 44-4b-5d-01-04-51, 44-4b-5d-01-04-21, 44-4b-5d-01-04-11, 44-4b-5d-01-04-81, 44-4b-5d-01-04-31, 44-4b-5d-01-04-39,
+44-4b-5d-01-04-19, 44-4b-5d-01-04-79, 44-4b-5d-01-04-01
 
-
-
+No RESP devices: 44-4b-5d-01-04-41, 44-4b-5d-01-04-a1, 44-4b-5d-01-04-b1
 
 ```{r, echo=FALSE}
 resp_filtered_df <- clustered_df %>%
-  filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91", "44-4b-5d-01-04-09", "44-4b-5d-01-04-51", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-81", "44-4b-5d-01-04-31", "44-4b-5d-01-04-39"), device == "RESPSENSOR") %>%
+  filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91", "44-4b-5d-01-04-09", "44-4b-5d-01-04-51", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-81", "44-4b-5d-01-04-31", "44-4b-5d-01-04-39", "44-4b-5d-01-04-19", "44-4b-5d-01-04-79", "44-4b-5d-01-04-01"), device == "RESPSENSOR") %>%
   group_by(hostName, jump_cluster) %>%
   summarize(diff_cap = max(capacity) - min(capacity), 
             mins = as.numeric(difftime(max(timestamp), min(timestamp), units = "mins"))) %>%
-  mutate(discharge_rate = diff_cap/mins)
+  mutate(discharge_rate = diff_cap/mins) %>%
+  filter(discharge_rate != 0)
 ```
 
 ```{r}
@@ -91,7 +106,7 @@ summary(resp_filtered_df$discharge_rate)
 
 ```{r, echo=FALSE, eval=FALSE}
 
-resp_cluster_lengths <- filtered_df %>%
+resp_cluster_lengths <- resp_filtered_df %>%
   group_by(hostName) %>%
   summarize(
     avg_discharge_rate = mean(discharge_rate) 
@@ -114,5 +129,5 @@ ggplot(combined_data, aes(x = sensor, y = lengths, fill = sensor)) +
   geom_boxplot(outlier.shape = NA) +  # Omit outliers
   labs(title = "Sensor Battery Discharge Rates", x = "Sensor", y = "Capacity per min(percentage/min)") +
   theme_minimal() +
-  ylim(0.025, 0.08)
+  ylim(0.026, 0.068)
 ```
