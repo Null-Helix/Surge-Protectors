@@ -13,6 +13,7 @@ minPts <- 1
 hostName <- NULL
 device <- NULL
 cluster_vec <- NULL
+c_flag = FALSE
 type <- NULL
 
 # Parse arguments
@@ -26,6 +27,7 @@ for (i in 1:(length(args) - 1)) {
   } else if (args[i] == "-d") {
     device <- args[i + 1]
   } else if (args[i] == "-c") {
+    c_flag = TRUE
     start <- as.integer(args[i + 1])
     end <- as.integer(args[i + 2])
     cluster_vec <- c(start:end)
@@ -77,13 +79,9 @@ plot1 <- ggplot(host_df, aes(x = timestamp, y = capacity, color = factor(cluster
   ggtitle("Capacity vs. Timestamp with Clustering") +
   theme_minimal()
 
-# Save plot1
-png(file = "discharge_cycle_plots/plot1.png", width = 800, height = 600)
-plot1
-dev.off()
-
-if (!is.null(cluster_vec)) {
+if (c_flag) {
   filtered_df <- host_df %>% filter(cluster %in% cluster_vec)
+  print(filtered_df)
   
   plot2 <- ggplot(filtered_df, aes(x = timestamp, y = capacity, color = factor(cluster))) +
     geom_point() +
@@ -97,7 +95,12 @@ if (!is.null(cluster_vec)) {
   }
   
   # Save plots as PNG files
-  png(file = "discharge_cycle_plots/plot2.png", width = 800, height = 600)
-  plot2
+  png(file = "discharge_cycle_plots/closer_plot.png", width = 800, height = 600)
+  print(plot2)
   dev.off()
 }
+
+# Save plot1
+png(file = "discharge_cycle_plots/plot1.png", width = 800, height = 600)
+plot1
+dev.off()
