@@ -79,11 +79,20 @@ mean(cluster_lengths$hours)
 The average use time for SPO2SENSOR batteries before being swapped out for hostName: 44-4b-5d-01-04-21 is 17 hours.
 
 ```{r, echo = FALSE}
+
 clustered_df <- df %>%
   arrange(hostName, device, timestamp) %>%
   group_by(hostName, device) %>%
-  mutate(jump_cluster = cumsum(capacity - lag(capacity, default = first(capacity)) > 5 | 
-                                is.na(lag(capacity))))
+  mutate(time_diff = difftime(timestamp, lag(timestamp, default = first(timestamp)), units = "mins"),
+         jump_cluster = cumsum(capacity - lag(capacity, default = first(capacity)) >= 10 |
+                               capacity - lag(capacity, default = first(capacity)) <= -10 |
+                               time_diff > 30 | 
+                               is.na(time_diff) |
+                               (capacity == 0 & lag(capacity, default = first(capacity)) != 0))) %>%
+  group_by(hostName, device, jump_cluster) %>%
+  filter(n() >= 70) %>%
+  ungroup()
+
 ```
 
 ```{r, echo = FALSE}
@@ -107,15 +116,19 @@ No SPO2SENSOR Devices - 44-4b-5d-01-04-a1, 44-4b-5d-01-04-41, 44-4b-5d-01-04-b1
 
 ```{r, echo=FALSE}
 spo2_cluster_lengths <- clustered_df %>%
-  filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91",
-               "44-4b-5d-01-04-09", "44-4b-5d-01-04-89", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-31",
-               "44-4b-5d-01-04-39"), device == "SPO2SENSOR") %>%
+  filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91", "44-4b-5d-01-04-09", "44-4b-5d-01-04-89", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-31", "44-4b-5d-01-04-39", "44-4b-5d-01-04-01", "44-4b-5d-01-04-79", "44-4b-5d-01-04-81", "44-4b-5d-01-04-01", "44-4b-5d-01-04-19"," 44-4b-5d-01-04-51"), device == "SPO2SENSOR") %>%
   group_by(hostName, jump_cluster) %>%
   summarize(
     mins = as.numeric(difftime(max(timestamp), min(timestamp), units = "mins")),
     hours = as.numeric(difftime(max(timestamp), min(timestamp), units = "hours")) 
   ) %>%
   ungroup()
+```
+
+### Summary SPO2 Hours:
+
+```{r}
+summary(spo2_cluster_lengths$hours)
 ```
 
 ```{r, echo=FALSE}
@@ -159,13 +172,29 @@ No RESP devices: 44-4b-5d-01-04-41, 44-4b-5d-01-04-a1, 44-4b-5d-01-04-b1
 
 ```{r, echo=FALSE}
 resp_cluster_lengths <- clustered_df %>%
-  filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91", "44-4b-5d-01-04-09", "44-4b-5d-01-04-51", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-81", "44-4b-5d-01-04-31", "44-4b-5d-01-04-39"), device == "RESPSENSOR") %>%
+  filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91", "44-4b-5d-01-04-09", "44-4b-5d-01-04-51", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-81", "44-4b-5d-01-04-31", "44-4b-5d-01-04-39", "44-4b-5d-01-04-19", "44-4b-5d-01-04-79", "44-4b-5d-01-04-01"), device == "RESPSENSOR") %>%
   group_by(hostName, jump_cluster) %>%
   summarize(
     mins = as.numeric(difftime(max(timestamp), min(timestamp), units = "mins")),
     hours = as.numeric(difftime(max(timestamp), min(timestamp), units = "hours")) 
   ) %>%
   ungroup()
+```
+
+### Summary RESP Hours:
+`
+```{r}
+summary(resp_cluster_lengths$hours)
+```
+
+```{r}
+filtered2_df <- clustered_df %>%
+  filter(hostName == "44-4b-5d-01-04-81", device == "SPO2SENSOR", jump_cluster == 4) 
+
+ggplot(filtered2_df, aes(x = timestamp, y = capacity, color = factor(jump_cluster))) +
+  geom_point() +
+  labs(x = "Timestamp", y = "Capacity", color = "Jump Cluster") +
+  theme_minimal()
 ```
 
 ```{r, echo=FALSE}
@@ -253,7 +282,7 @@ permutation_test_mean_difference <- function(resp_hours, spo2_hours, num_permuta
 set.seed(123) # For reproducibility
 num_permutations <- 1000
 test_result <- permutation_test_mean_difference(resp_hours, spo2_hours, num_permutations)
-print(test_result)
+print(test_result$p_value)
 
 
 ```
@@ -269,5 +298,4 @@ ggplot(filtered2_df, aes(x = timestamp, y = capacity, color = factor(jump_cluste
   labs(x = "Timestamp", y = "Capacity", color = "Jump Cluster") +
   theme_minimal()
 ```
-
 
