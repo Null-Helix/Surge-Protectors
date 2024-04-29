@@ -116,9 +116,6 @@ knitr::kable(resp_cluster_lengths, format = "markdown")
 
 ```
 
-
-
-
 ```{r, echo = FALSE}
 spo2_data <- data.frame(lengths = spo2_filtered_df$discharge_rate, sensor = "SPO2SENSOR")
 resp_data <- data.frame(lengths = resp_filtered_df$discharge_rate, sensor = "RESPSENSOR")
@@ -131,3 +128,78 @@ ggplot(combined_data, aes(x = sensor, y = lengths, fill = sensor)) +
   theme_minimal() +
   ylim(0.026, 0.068)
 ```
+
+$H_o:$ The distribution of Discharge Rates of SPO2 Device Batteries is the same as the distribution of Discharge Rate of Resp Device Batteries
+
+$H_a:$ The distribution of Discharge Rates of SPO2 Device Batteries is greater than the distribution of Discharge Rate of Resp Device Batteries
+
+
+Removing Outliers:
+
+```{r}
+q1 <- quantile(spo2_filtered_df$discharge_rate, 0.25)
+q3 <- quantile(spo2_filtered_df$discharge_rate, 0.75)
+iqr <- q3 - q1
+
+lower_bound <- q1 - 1.5 * iqr
+upper_bound <- q3 + 1.5 * iqr
+
+spo2_filtered_df <- spo2_filtered_df %>%
+  filter(discharge_rate >= lower_bound, discharge_rate <= upper_bound)
+```
+
+```{r}
+q1 <- quantile(resp_filtered_df$discharge_rate, 0.25)
+q3 <- quantile(resp_filtered_df$discharge_rate, 0.75)
+iqr <- q3 - q1
+
+lower_bound <- q1 - 1.5 * iqr
+upper_bound <- q3 + 1.5 * iqr
+
+resp_filtered_df <- resp_filtered_df %>%
+  filter(discharge_rate >= lower_bound, discharge_rate <= upper_bound)
+```
+
+Normality Assumption:
+
+```{r}
+require(car)
+qqPlot(resp_filtered_df$discharge_rate, ylab = "Discharge Rates for RESP device batteries")
+```
+
+```{r}
+require(car)
+qqPlot(spo2_filtered_df$discharge_rate, ylab = "Discharge Rates for SPO2 device batteries")
+```
+
+Equal Shape and Spread: 
+
+```{r}
+par(mfrow = c(2, 1))
+
+hist(spo2_filtered_df$discharge_rate, main = "Discharge Rates for SPO2 Sensor Batteries", xlab = "Discharge Rate (Capacity/Minute)", ylab = "Frequency", xlim = c(0, 0.1))
+
+hist(resp_filtered_df$discharge_rate, main = "Discharge Rates for RESP Sensor Batteries", xlab = "Discharge Rate (Capacity in Percentage/Minute)", ylab = "Frequency", xlim = c(0, 0.1))
+
+```
+
+Equal Variance Assumption:
+
+```{r}
+(s_s = sd(spo2_filtered_df$discharge_rate))
+```
+
+```{r}
+(s_r = sd(resp_filtered_df$discharge_rate))
+```
+
+```{r}
+(s_s/s_r)
+```
+
+$\frac{\sigma_s}{\sigma_r} = \frac{0.01164306}{0.001791995} = 6.49726$
+
+```{r}
+wilcox.test(spo2_filtered_df$discharge_rate, resp_filtered_df$discharge_rate, mu = 0, alternative = "greater")
+```
+
