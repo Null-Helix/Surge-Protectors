@@ -1,0 +1,160 @@
+---
+title: "pattern4"
+output: html_document
+date: "2024-04-29"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = FALSE}
+#install.packages("ggplot2")
+#install.packages("dpylr")
+#install.packages("tidyr")
+#install.packages("readr")
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(readr)
+```
+
+```{r, echo=FALSE}
+df = read_csv("BatteryTableAllLogs.csv")
+```
+
+```{r, echo = FALSE}
+clustered_df <- df %>%
+  arrange(hostName, device, timestamp) %>%
+  group_by(hostName, device) %>%
+  mutate(time_diff = difftime(timestamp, lag(timestamp, default = first(timestamp)), units = "mins"),
+         jump_cluster = cumsum(capacity - lag(capacity, default = first(capacity)) >= 10 |
+                               capacity - lag(capacity, default = first(capacity)) <= -10 |
+                               time_diff > 30 | 
+                               is.na(time_diff) |
+                               (capacity == 0 & lag(capacity, default = first(capacity)) != 0))) %>%
+  group_by(hostName, device, jump_cluster) %>%
+  filter(n() >= 70) %>%
+  ungroup()
+```
+
+```{r}
+spo2_filtered_df = clustered_df %>%
+  filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91", "44-4b-5d-01-04-09", "44-4b-5d-01-04-89", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-31", "44-4b-5d-01-04-39", "44-4b-5d-01-04-01", "44-4b-5d-01-04-79", "44-4b-5d-01-04-81", "44-4b-5d-01-04-01", "44-4b-5d-01-04-19"," 44-4b-5d-01-04-51"), device == "SPO2SENSOR") %>%
+  group_by(hostName, jump_cluster) %>%
+  summarize(diff_cap = max(capacity) - min(capacity), 
+            mins = as.numeric(difftime(max(timestamp), min(timestamp), units = "mins")), avg_tmp = mean(temperature)) %>%
+  mutate(discharge_rate = diff_cap/mins) %>%
+  filter(discharge_rate != 0)
+```
+
+```{r, echo=FALSE}
+resp_filtered_df <- clustered_df %>%
+  filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91", "44-4b-5d-01-04-09", "44-4b-5d-01-04-51", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-81", "44-4b-5d-01-04-31", "44-4b-5d-01-04-39", "44-4b-5d-01-04-19", "44-4b-5d-01-04-79", "44-4b-5d-01-04-01"), device == "RESPSENSOR") %>%
+  group_by(hostName, jump_cluster) %>%
+  summarize(diff_cap = max(capacity) - min(capacity), 
+            mins = as.numeric(difftime(max(timestamp), min(timestamp), units = "mins")), avg_tmp = mean(temperature)) %>%
+  mutate(discharge_rate = diff_cap/mins) %>%
+  filter(discharge_rate != 0)
+```
+
+
+```{r}
+q1 <- quantile(spo2_filtered_df$discharge_rate, 0.25)
+q3 <- quantile(spo2_filtered_df$discharge_rate, 0.75)
+iqr <- q3 - q1
+
+lower_bound <- q1 - 1.5 * iqr
+upper_bound <- q3 + 1.5 * iqr
+
+spo2_filtered_df <- spo2_filtered_df %>%
+  filter(discharge_rate >= lower_bound, discharge_rate <= upper_bound)
+```
+
+```{r}
+q1 <- quantile(resp_filtered_df$discharge_rate, 0.25)
+q3 <- quantile(resp_filtered_df$discharge_rate, 0.75)
+iqr <- q3 - q1
+
+lower_bound <- q1 - 1.5 * iqr
+upper_bound <- q3 + 1.5 * iqr
+
+resp_filtered_df <- resp_filtered_df %>%
+  filter(discharge_rate >= lower_bound, discharge_rate <= upper_bound)
+```
+
+```{r}
+ggplot(spo2_filtered_df, aes(x = discharge_rate, y = avg_tmp)) +
+  geom_point() +  # Add points
+  labs(x = "Discharge Rate", y = "Average Temperature") +  # Label axes
+  ggtitle("SPO2: Average Temperature vs. Discharge Rate")  # Title
+```
+
+```{r}
+cor(spo2_filtered_df$discharge_rate, spo2_filtered_df$avg_tmp)
+```
+
+```{r}
+ggplot(resp_filtered_df, aes(x = discharge_rate, y = avg_tmp)) +
+  geom_point() +  # Add points
+  labs(x = "Discharge Rate", y = "Average Temperature") +  # Label axes
+  ggtitle("RESP: Average Temperature vs. Discharge Rate")  # Title
+```
+
+```{r}
+cor(resp_filtered_df$discharge_rate, resp_filtered_df$avg_tmp)
+```
+
+```{r}
+library(ggplot2)
+
+resp_filtered_df$Source <- "RESP"
+spo2_filtered_df$Source <- "SPO2"
+
+# Create the comparison boxplot
+ggplot() +
+  geom_boxplot(data = resp_filtered_df, aes(x = Source, y = avg_tmp), position = position_dodge(width = 0.75), fill = "blue", alpha = 0.5, outlier.shape = NA) +
+  geom_boxplot(data = spo2_filtered_df, aes(x = Source, y = avg_tmp), position = position_dodge(width = 0.75), fill = "red", alpha = 0.5, outlier.shape = NA) +
+  ylab("Average Temperature") +
+  ggtitle("Comparison of Average Temperature") +
+  theme_minimal()  # Customize the theme if needed
+
+```
+
+```{r}
+require(car)
+qqPlot(resp_filtered_df$avg_tmp, ylab = "Average Temperature of Resp Devices")
+```
+
+
+```{r}
+require(car)
+qqPlot(spo2_filtered_df$avg_tmp, ylab = "Average Temperature of SpO2 Devices")
+```
+
+```{r}
+(s_r = sd(resp_filtered_df$avg_tmp))
+(s_s = sd(spo2_filtered_df$avg_tmp))
+s_r/s_s
+```
+
+$\frac{\sigma_r}{\sigma_s} = \frac{1.157235}{1.74147} = 0.6645161$
+
+
+$H_o: \mu_r = \mu_s$ or $\mu_r - \mu_s = 0$
+
+$H_a: \mu_r > \mu_s$ or $\mu_r - \mu_s > 0$
+
+
+
+```{r}
+t.test(resp_filtered_df$avg_tmp, spo2_filtered_df$avg_tmp, alternative="greater", paired=FALSE, var.equal=TRUE)
+```
+
+$H_o: \mu_r = \mu_s$ or $\mu_r - \mu_s = 4$
+
+$H_a: \mu_r > \mu_s$ or $\mu_r - \mu_s > 4$
+
+```{r}
+t.test(resp_filtered_df$avg_tmp, spo2_filtered_df$avg_tmp, alternative="greater", paired=FALSE, var.equal=TRUE, mu = 4)
+```
