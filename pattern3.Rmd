@@ -1,0 +1,148 @@
+---
+title: "pattern 3"
+output: html_document
+date: "2024-04-29"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = FALSE}
+#install.packages("ggplot2")
+#install.packages("dpylr")
+#install.packages("tidyr")
+#install.packages("readr")
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(readr)
+```
+
+```{r, echo=FALSE}
+df = read_csv("BatteryTableAllLogs.csv")
+```
+
+```{r, echo = FALSE}
+clustered_df <- df %>%
+  arrange(hostName, device, timestamp) %>%
+  group_by(hostName, device) %>%
+  mutate(time_diff = difftime(timestamp, lag(timestamp, default = first(timestamp)), units = "mins"),
+         jump_cluster = cumsum(capacity - lag(capacity, default = first(capacity)) >= 10 |
+                               capacity - lag(capacity, default = first(capacity)) <= -10 |
+                               time_diff > 30 | 
+                               is.na(time_diff) |
+                               (capacity == 0 & lag(capacity, default = first(capacity)) != 0))) %>%
+  group_by(hostName, device, jump_cluster) %>%
+  filter(n() >= 70) %>%
+  ungroup()
+```
+
+```{r}
+spo2_filtered_df = clustered_df %>%
+  filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91", "44-4b-5d-01-04-09", "44-4b-5d-01-04-89", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-31", "44-4b-5d-01-04-39", "44-4b-5d-01-04-01", "44-4b-5d-01-04-79", "44-4b-5d-01-04-81", "44-4b-5d-01-04-01", "44-4b-5d-01-04-19"," 44-4b-5d-01-04-51"), device == "SPO2SENSOR") %>%
+  group_by(hostName, jump_cluster) %>%
+  summarize(diff_cap = max(capacity) - min(capacity), 
+            mins = as.numeric(difftime(max(timestamp), min(timestamp), units = "mins"))) %>%
+  mutate(discharge_rate = diff_cap/mins) %>%
+  filter(discharge_rate != 0)
+```
+
+```{r, echo=FALSE}
+resp_filtered_df <- clustered_df %>%
+  filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91", "44-4b-5d-01-04-09", "44-4b-5d-01-04-51", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-81", "44-4b-5d-01-04-31", "44-4b-5d-01-04-39", "44-4b-5d-01-04-19", "44-4b-5d-01-04-79", "44-4b-5d-01-04-01"), device == "RESPSENSOR") %>%
+  group_by(hostName, jump_cluster) %>%
+  summarize(diff_cap = max(capacity) - min(capacity), 
+            mins = as.numeric(difftime(max(timestamp), min(timestamp), units = "mins"))) %>%
+  mutate(discharge_rate = diff_cap/mins) %>%
+  filter(discharge_rate != 0)
+```
+
+
+```{r}
+q1 <- quantile(spo2_filtered_df$discharge_rate, 0.25)
+q3 <- quantile(spo2_filtered_df$discharge_rate, 0.75)
+iqr <- q3 - q1
+
+lower_bound <- q1 - 1.5 * iqr
+upper_bound <- q3 + 1.5 * iqr
+
+spo2_filtered_df <- spo2_filtered_df %>%
+  filter(discharge_rate >= lower_bound, discharge_rate <= upper_bound)
+```
+
+```{r}
+q1 <- quantile(resp_filtered_df$discharge_rate, 0.25)
+q3 <- quantile(resp_filtered_df$discharge_rate, 0.75)
+iqr <- q3 - q1
+
+lower_bound <- q1 - 1.5 * iqr
+upper_bound <- q3 + 1.5 * iqr
+
+resp_filtered_df <- resp_filtered_df %>%
+  filter(discharge_rate >= lower_bound, discharge_rate <= upper_bound)
+```
+
+```{r}
+ggplot(resp_filtered_df, aes(x = jump_cluster, y = discharge_rate, group = hostName, color = hostName)) +
+  geom_point() +
+  geom_line() +
+  labs(title = "RESP: Jump Cluster vs Discharge Rate",
+       x = "Jump Cluster",
+       y = "Discharge Rate") +
+  theme_minimal()
+```
+
+```{r}
+ggplot(spo2_filtered_df, aes(x = jump_cluster, y = discharge_rate, group = hostName, color = hostName)) +
+  geom_point() +
+  geom_line() +
+  labs(title = "SPO2: Jump Cluster vs Discharge Rate",
+       x = "Jump Cluster",
+       y = "Discharge Rate") +
+  theme_minimal()
+```
+
+```{r}
+spo2_filtered_df = spo2_filtered_df %>% 
+  group_by(hostName) %>%
+  arrange(jump_cluster) %>%
+  mutate(jump_cluster = row_number())
+
+spo2_fnl <- spo2_filtered_df %>%
+  group_by(hostName) %>%
+  filter(jump_cluster == min(jump_cluster) | jump_cluster == max(jump_cluster)) %>%
+  mutate(Jump = ifelse(jump_cluster == min(jump_cluster), 1, 2))
+
+ggplot(spo2_fnl, aes(x = Jump, y = discharge_rate, color = hostName)) +
+  geom_point() +
+  geom_line() +
+  labs(title = "SPO2: Discharge Rate for First and Last Cycle",
+       x = "First and Last Discharge Cycle",
+       y = "Discharge Rate") +
+  scale_x_continuous(breaks = c(1, 2), labels = c("1", "2")) + # Set custom labels for x-axis
+  theme_minimal()
+```
+
+
+```{r}
+resp_filtered_df = resp_filtered_df %>% 
+  group_by(hostName) %>%
+  arrange(jump_cluster) %>%
+  mutate(jump_cluster = row_number())
+
+resp_fnl <- resp_filtered_df %>%
+  group_by(hostName) %>%
+  filter(jump_cluster == min(jump_cluster) | jump_cluster == max(jump_cluster)) %>%
+  mutate(Jump = ifelse(jump_cluster == min(jump_cluster), 1, 2))
+
+ggplot(resp_fnl, aes(x = Jump, y = discharge_rate, color = hostName)) +
+  geom_point() +
+  geom_line() +
+  labs(title = "RESP: Discharge Rate for First and Last Cycle",
+       x = "First and Last Discharge Cycle",
+       y = "Discharge Rate") +
+  scale_x_continuous(breaks = c(1, 2), labels = c("1", "2")) + # Set custom labels for x-axis
+  theme_minimal()
+```
+
