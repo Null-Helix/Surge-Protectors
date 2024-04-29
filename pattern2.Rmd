@@ -1,0 +1,128 @@
+---
+title: "data analysis 5"
+output: html_document
+date: "2024-04-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = FALSE}
+#install.packages("ggplot2")
+#install.packages("dpylr")
+#install.packages("tidyr")
+#install.packages("readr")
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(readr)
+```
+
+```{r, echo=FALSE}
+df = read_csv("BatteryTableAllLogs.csv")
+```
+
+# Pattern Analysis 2
+
+```{r, echo = FALSE}
+
+clustered_df <- df %>%
+  arrange(hostName, device, timestamp) %>%
+  group_by(hostName, device) %>%
+  mutate(time_diff = difftime(timestamp, lag(timestamp, default = first(timestamp)), units = "mins"),
+         jump_cluster = cumsum(capacity - lag(capacity, default = first(capacity)) >= 10 |
+                               capacity - lag(capacity, default = first(capacity)) <= -10 |
+                               time_diff > 30 | 
+                               is.na(time_diff) |
+                               (capacity == 0 & lag(capacity, default = first(capacity)) != 0))) %>%
+  group_by(hostName, device, jump_cluster) %>%
+  filter(n() >= 70) %>%
+  ungroup()
+
+```
+
+```{r, echo=FALSE}
+spo2_cluster_lengths <- clustered_df %>%
+  filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91", "44-4b-5d-01-04-09", "44-4b-5d-01-04-89", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-31", "44-4b-5d-01-04-39", "44-4b-5d-01-04-01", "44-4b-5d-01-04-79", "44-4b-5d-01-04-81", "44-4b-5d-01-04-01", "44-4b-5d-01-04-19"," 44-4b-5d-01-04-51"), device == "SPO2SENSOR") %>%
+  group_by(hostName, jump_cluster) %>%
+  summarize(
+    mins = as.numeric(difftime(max(timestamp), min(timestamp), units = "mins")),
+    hours = as.numeric(difftime(max(timestamp), min(timestamp), units = "hours")) 
+  ) %>%
+  ungroup()
+```
+
+```{r, echo=FALSE}
+resp_cluster_lengths <- clustered_df %>%
+  filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91", "44-4b-5d-01-04-09", "44-4b-5d-01-04-51", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-81", "44-4b-5d-01-04-31", "44-4b-5d-01-04-39", "44-4b-5d-01-04-19", "44-4b-5d-01-04-79", "44-4b-5d-01-04-01"), device == "RESPSENSOR") %>%
+  group_by(hostName, jump_cluster) %>%
+  summarize(
+    mins = as.numeric(difftime(max(timestamp), min(timestamp), units = "mins")),
+    hours = as.numeric(difftime(max(timestamp), min(timestamp), units = "hours")) 
+  ) %>%
+  ungroup()
+```
+
+Removing Outliers:
+
+```{r}
+q1 <- quantile(resp_cluster_lengths$hours, 0.25)
+q3 <- quantile(resp_cluster_lengths$hours, 0.75)
+iqr <- q3 - q1
+
+lower_bound <- q1 - 1.5 * iqr
+upper_bound <- q3 + 1.5 * iqr
+
+resp_cluster_lengths <- resp_cluster_lengths %>%
+  filter(hours >= lower_bound, hours <= upper_bound)
+```
+
+```{r}
+q1 <- quantile(spo2_cluster_lengths$hours, 0.25)
+q3 <- quantile(spo2_cluster_lengths$hours, 0.75)
+iqr <- q3 - q1
+
+lower_bound <- q1 - 1.5 * iqr
+upper_bound <- q3 + 1.5 * iqr
+
+spo2_cluster_lengths <- spo2_cluster_lengths %>%
+  filter(hours >= lower_bound, hours <= upper_bound)
+```
+
+$H_o:$ The Median Hours of SPO2 Device Battery Usage equals the Median Hours of RESP Device Battery Usage, ie, $Med(X_s) = Med(X_r)$ or $Med(X_s) - Med(X_r) = 0$
+
+$H_a:$ The Median Hours of SPO2 Device Battery Usage does not equal the Median Hours of RESP Device Battery Usage, ie, $Med(X_s) \ne Med(X_r)$ or $Med(X_s) - Med(X_r) \ne 0$
+
+Assumptions:
+
+Equal Shape and Spread: 
+
+```{r}
+par(mfrow = c(2, 1))
+
+hist(spo2_cluster_lengths$hours, main = "Duration of Continuous Usage for SPO2 Sensor Batteries in Hours", xlab = "Hours", ylab = "Frequency")
+
+hist(resp_cluster_lengths$hours, main = "Duration of Continuous Usage for RESP Sensor Batteries in Hours", xlab = "Hours", ylab = "Frequency")
+
+```
+
+Equal Variance Assumption:
+
+```{r}
+(s_s = sd(spo2_cluster_lengths$hours))
+```
+
+```{r}
+(s_r = sd(resp_cluster_lengths$hours))
+```
+
+```{r}
+(s_s/s_r)
+```
+
+$\frac{\sigma_s}{\sigma_r} = \frac{8.538964}{8.217807} = 1.039081$
+
+```{r}
+wilcox.test(spo2_cluster_lengths$hours, resp_cluster_lengths$hours, mu = 0, alternative = "two.sided")
+```
