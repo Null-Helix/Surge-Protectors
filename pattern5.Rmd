@@ -1,0 +1,125 @@
+---
+title: "pattern5"
+output: html_document
+date: "2024-04-29"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = FALSE}
+#install.packages("ggplot2")
+#install.packages("dpylr")
+#install.packages("tidyr")
+#install.packages("readr")
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(readr)
+```
+
+```{r, echo=FALSE}
+df = read_csv("BatteryTableAllLogs.csv")
+```
+
+```{r, echo = FALSE}
+clustered_df <- df %>%
+  arrange(hostName, device, timestamp) %>%
+  group_by(hostName, device) %>%
+  mutate(time_diff = difftime(timestamp, lag(timestamp, default = first(timestamp)), units = "mins"),
+         jump_cluster = cumsum(capacity - lag(capacity, default = first(capacity)) >= 10 |
+                               capacity - lag(capacity, default = first(capacity)) <= -10 |
+                               time_diff > 30 | 
+                               is.na(time_diff) |
+                               (capacity == 0 & lag(capacity, default = first(capacity)) != 0))) %>%
+  group_by(hostName, device, jump_cluster) %>%
+  filter(n() >= 70) %>%
+  ungroup()
+```
+
+```{r}
+spo2_filtered_df = clustered_df %>%
+  filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91", "44-4b-5d-01-04-09", "44-4b-5d-01-04-89", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-31", "44-4b-5d-01-04-39", "44-4b-5d-01-04-01", "44-4b-5d-01-04-79", "44-4b-5d-01-04-81", "44-4b-5d-01-04-01", "44-4b-5d-01-04-19"," 44-4b-5d-01-04-51"), device == "SPO2SENSOR") %>%
+  group_by(hostName, jump_cluster) %>%
+  summarize(diff_cap = max(capacity) - min(capacity), 
+            hours = as.numeric(difftime(max(timestamp), min(timestamp), units = "hours")), 
+            avg_tmp = mean(temperature)) %>%
+  mutate(discharge_rate = diff_cap/hours) %>%
+  filter(discharge_rate != 0)
+```
+
+```{r, echo=FALSE}
+resp_filtered_df <- clustered_df %>%
+  filter(hostName %in% c("44-4b-5d-01-04-29", "44-4b-5d-01-04-91", "44-4b-5d-01-04-09", "44-4b-5d-01-04-51", "44-4b-5d-01-04-21", "44-4b-5d-01-04-11", "44-4b-5d-01-04-81", "44-4b-5d-01-04-31", "44-4b-5d-01-04-39", "44-4b-5d-01-04-19", "44-4b-5d-01-04-79", "44-4b-5d-01-04-01"), device == "RESPSENSOR") %>%
+  group_by(hostName, jump_cluster) %>%
+  summarize(diff_cap = max(capacity) - min(capacity), 
+            hours = as.numeric(difftime(max(timestamp), min(timestamp), units = "hours")), 
+            avg_tmp = mean(temperature)) %>%
+  mutate(discharge_rate = diff_cap/hours) %>%
+  filter(discharge_rate != 0)
+```
+
+
+```{r}
+# Filter out outliers in avg_tmp column based on IQR
+spo2_filtered_df_filtered <- spo2_filtered_df %>%
+  group_by(hostName, jump_cluster) %>%
+  filter(between(avg_tmp, quantile(avg_tmp, 0.25) - 1.5 * IQR(avg_tmp), quantile(avg_tmp, 0.75) + 1.5 * IQR(avg_tmp)))
+
+# Plot hours against temperature for filtered data
+ggplot(spo2_filtered_df_filtered, aes(x = hours, y = avg_tmp)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +  # Add linear regression line
+  labs(x = "Hours", y = "Average Temperature", title = "SPO2: Hours vs. Average Temperature (Filtered)")
+
+# Run linear regression
+lm_model <- lm(avg_tmp ~ hours, data = spo2_filtered_df_filtered)
+
+# Summarize the linear regression
+summary(lm_model)
+```
+
+```{r}
+cor(spo2_filtered_df$avg_tmp, spo2_filtered_df$hours)
+```
+
+```{r}
+lm_model <- lm(avg_tmp ~ hours, data = spo2_filtered_df_filtered)
+
+# Summarize the linear regression
+summary(lm_model)
+plot(lm_model, which = 1) 
+```
+
+```{r}
+# Filter out outliers in avg_tmp column based on IQR
+resp_filtered_df_filtered <- resp_filtered_df %>%
+  group_by(hostName, jump_cluster) %>%
+  filter(between(avg_tmp, quantile(avg_tmp, 0.25) - 1.5 * IQR(avg_tmp), quantile(avg_tmp, 0.75) + 1.5 * IQR(avg_tmp)))
+
+# Plot hours against temperature for filtered data
+ggplot(resp_filtered_df_filtered, aes(x = hours, y = avg_tmp)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +  # Add linear regression line
+  labs(x = "Hours", y = "Average Temperature", title = "RESP: Hours vs. Average Temperature (Filtered)")
+
+# Run linear regression
+lm_model <- lm(avg_tmp ~ hours, data = resp_filtered_df_filtered)
+
+# Summarize the linear regression
+summary(lm_model)
+```
+
+```{r}
+cor(resp_filtered_df$avg_tmp, resp_filtered_df$hours)
+```
+
+```{r}
+lm_model <- lm(avg_tmp ~ hours, data = resp_filtered_df_filtered)
+
+# Summarize the linear regression
+summary(lm_model)
+
+plot(lm_model, which = 1) 
+```
