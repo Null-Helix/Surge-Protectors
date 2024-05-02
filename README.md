@@ -18,7 +18,7 @@ Extract the csv file from BatteryTableAllLogs.zip
 Run `pip3 install -r requirements.txt (on mac)`
 Run `python3 main.py (on mac)`
 Navigate to the frontend directory
-Run `npm install`
+Run `npm install` -npm 10.2.4 is latest working version
 Run `npm run dev`
 In your web browser, go to http://localhost:5173, where the frontend application is hosted. The backend is http://localhost:5001.
 
