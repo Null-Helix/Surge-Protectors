@@ -9,9 +9,7 @@ import matplotlib
 from io import BytesIO
 import json
 import os
-import numpy as np
 from datetime import datetime
-import seaborn as sns
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -22,6 +20,9 @@ csvfile = os.path.join(".", "BatteryTableAllLogs.csv")
 hub_df = pd.read_csv(csvfile)
 matplotlib.use('Agg') 
 
+"""
+This method is used to determine the discharge cycle of the batteries
+"""
 def calculate_jump_clusters(group):
     capacity_diff = group["capacity"] - group["capacity"].shift(fill_value=group["capacity"].iloc[0])
     jump_clusters = (capacity_diff > 5).cumsum()
@@ -30,11 +31,18 @@ def calculate_jump_clusters(group):
 
     return group
 
+"""
+This method is used to convert minutes to hours and minutes
+"""
 def convert_minutes_to_hours_minutes(minutes):
     hours = minutes // 60
     remaining_minutes = minutes % 60
     return f"{int(hours)}h {int(remaining_minutes)}m"
-    
+
+"""
+Based on hostname, device, stat and dischargeCycle (optional), this plot a scatter plot
+about those data and using matplotlib return the png
+"""
 class Plot(Resource):
     def get(self, hostname, device, stat, dischargeCycle = None):
 
@@ -47,7 +55,6 @@ class Plot(Resource):
                                (hub_df['device'] == device)]
         
         if dischargeCycle is not None:
-            # filter down the sepcific hostName, device chosen by user to a discharge cycle user specified
             filtered_data = filtered_data[filtered_data["cycle"] == dischargeCycle]
         
         filtered_data = filtered_data.copy()
@@ -77,7 +84,6 @@ class Plot(Resource):
         elif stat == "voltage":
             plt.ylabel('Voltage (mV)')
         else:
-            # current
             plt.ylabel('Current (mA)')
 
         buffer = BytesIO()
@@ -87,6 +93,14 @@ class Plot(Resource):
 
         return send_file(buffer, mimetype='image/png')
 
+"""
+Based on hostname, device, stat and dischargeCycle (optional), this will return json
+about all of the statistics user based on the param user has chosen from frontend
+
+Note: Utilized this endpoint to plot the graph at homepage of frontend. If the datapoint
+exceeds more than 10000, will randomly sample and will return only 10000 data points to 
+front end. 
+"""
 class HubInfo(Resource):
     def get(self, hostname, device, stat, dischargeCycle = None):
 
@@ -103,7 +117,6 @@ class HubInfo(Resource):
                                (hub_df['device'] == device)]
         
         if dischargeCycle is not None:
-            # filter down the sepcific hostName, device chosen by user to a discharge cycle user specified
             filtered_data = filtered_data[filtered_data["cycle"] == int(dischargeCycle)]
 
         stat = stat.lower()
@@ -122,7 +135,10 @@ class HubInfo(Resource):
         cache.set((hostname, device, stat), json_data)
 
         return Response(json_data, mimetype='application/json')
-    
+
+"""
+Return json data of all the hostnames in the dataset
+"""
 class HostName(Resource):
     def get(self):
         cached_data = cache.get('all_hostnames')
@@ -133,7 +149,11 @@ class HostName(Resource):
         json_data = json.dumps(hostnames, indent=1)
         cache.set('all_hostnames', json_data)
         return Response(json_data, mimetype='application/json')
-    
+
+"""
+Return statistics about log files we processed from the parser 
+(file we will get from parser about log info is call logData.txt)
+"""
 class LogDataInfo(Resource):
     def get(self):
         file_path = 'logData.txt'
@@ -155,6 +175,10 @@ class LogDataInfo(Resource):
         json_data = json.dumps(data, indent=4)
         return Response(json_data, mimetype='application/json')
 
+"""
+Based on the hostname, return json data of five number summary (min, 25th percentile, median, 75th percentile, and max)
+about discharge cycle, temperature, voltage, current and capcity
+"""
 class StatFiveNumberSummary(Resource):
     def get(self, hostname):
 
@@ -210,6 +234,11 @@ class StatFiveNumberSummary(Resource):
 
         return jsonify(summaries)
 
+"""
+Based on hostname, return json data about timestamp, discharge cycle annd capcity 
+This endpoint wasn't utilized at frontend due to time constraint. Was planning to utilize this data to graph 
+discharge cycles at stats page of frontend.
+"""
 class CycleTimeStampData(Resource):
     def get(self, hostname):
         filtered_data = hub_df[(hub_df['hostName'] == hostname)]
@@ -225,6 +254,12 @@ class CycleTimeStampData(Resource):
         json_data = filtered_data.to_json(indent = 1, orient='records')
         return Response(json_data, mimetype='application/json')
 
+"""
+Based on the hostname, return statistics about temperature (min, max), voltage (min, max),
+earliest and latest time stamp of data, and many more. 
+
+Note: This endpoint is utilized to construct the stats pages at frontend
+"""
 class Stat(Resource):
     def get(self, hostname):
 
@@ -278,11 +313,17 @@ class Stat(Resource):
             'device_stats': device_stats
         }
 
-        # Serialize data to JSON
         json_data = json.dumps(json_serializable_data)
        
         return Response(json_data, mimetype='application/json')
-    
+
+"""
+Another endpoint for stats page, this will return least/longest
+hours SPO2 and RESP sensor batteries are used before they are swapped
+
+Note: This logic can be combined with another endpoint that is also 
+returning stats info about each hostname
+"""
 class DischargeDataPerHost(Resource):
     def get(self, hostname):
         
@@ -297,8 +338,6 @@ class DischargeDataPerHost(Resource):
             clustered_df
             .sort_values(by=["hostName", "device", "timestamp"])
         )
-
-        print(clustered_df)
 
         clustered_df.loc[: , 'timestamp'] = pd.to_datetime(clustered_df['timestamp'])
 
@@ -343,39 +382,6 @@ class DischargeDataPerHost(Resource):
         cache.set(hostname + "discharge", response_data)
 
         return jsonify(response_data)
-    
-class WholeDischargeData(Resource):
-    def get(self):
-        cached_response = cache.get("WholeDischarge")
-        if cached_response:
-            return jsonify(cached_response)
-        
-        clustered_df = (
-            hub_df
-            .sort_values(by=["hostName", "device", "timestamp"])
-        )
-
-        clustered_df.loc[: , 'timestamp'] = pd.to_datetime(clustered_df['timestamp'])
-
-        filtered_df_spo2 = clustered_df[(clustered_df["device"] == "SPO2SENSOR")]
-        
-        spo2_cluster_lengths = (
-            filtered_df_spo2
-            .groupby(["hostName", "cycle"])
-            .agg(
-                mins=("timestamp", lambda x: (x.max() - x.min()).total_seconds() / 60),
-                hours=("timestamp", lambda x: (x.max() - x.min()).total_seconds() / 3600)
-            )
-            .reset_index()
-        )
-
-        print("Cluter", spo2_cluster_lengths)
-
-        response_data = {
-            "spo2_data": spo2_cluster_lengths
-        }
-
-        return jsonify(response_data)
 
 api.add_resource(Plot, "/plot/<string:hostname>/<string:device>/<string:stat>", "/plot/<string:hostname>/<string:device>/<string:stat>/<string:dischargeCycle>")
 api.add_resource(HubInfo, "/hubinfo/<string:hostname>/<string:device>/<string:stat>", "/hubinfo/<string:hostname>/<string:device>/<string:stat>/<string:dischargeCycle>")
@@ -385,7 +391,6 @@ api.add_resource(StatFiveNumberSummary, "/stat_five_number_summary/<string:hostn
 api.add_resource(Stat, "/stat/<string:hostname>")
 api.add_resource(CycleTimeStampData, "/cycle_timestamp/<string:hostname>")
 api.add_resource(DischargeDataPerHost, "/discharge/<string:hostname>")
-api.add_resource(WholeDischargeData, "/whole_discharge")
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
